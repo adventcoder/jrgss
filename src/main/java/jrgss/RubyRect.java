@@ -1,5 +1,6 @@
 package jrgss;
 
+import java.awt.Rectangle;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -32,16 +33,16 @@ public class RubyRect extends RubyObject {
         super(runtime, metaClass);
     }
 
-    public RubyRect(Ruby runtime, boolean useObjectSpace) {
+    public RubyRect(Ruby runtime, int x, int y, int width, int height, boolean useObjectSpace) {
         super(runtime, RGSS.rectClass, useObjectSpace);
-    }
-
-    public RubyRect(Ruby runtime, int x, int y, int width, int height) {
-        this(runtime, RGSS.rectClass);
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
+    }
+
+    public RubyRect(Ruby runtime, int x, int y, int width, int height) {
+        this(runtime, x, y, width, height, true);
     }
 
     @JRubyMethod
@@ -78,7 +79,7 @@ public class RubyRect extends RubyObject {
 
     @JRubyMethod(name = "width=")
     public IRubyObject width_set(IRubyObject obj) {
-        this.y = RubyNumeric.num2int(obj);
+        this.width = RubyNumeric.num2int(obj);
         return obj;
     }
 
@@ -147,6 +148,10 @@ public class RubyRect extends RubyObject {
         return getRuntime().newString(String.format("(%d, %d, %d, %d)", x, y, width, height));
     }
 
+    public Rectangle toJavaRectangle() {
+        return new Rectangle(x, y, width, height);
+    }
+
     @JRubyMethod(name = "==", required = 1)
     @Override
     public IRubyObject op_equal(ThreadContext context, IRubyObject obj) {
@@ -168,14 +173,15 @@ public class RubyRect extends RubyObject {
     @JRubyMethod(meta = true)
     public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
         RubyString data = obj.convertToString();
-        RubyRect rect = (RubyRect) ((RubyClass) recv).allocate();
         ByteBuffer buf = ByteBuffer.wrap(data.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
+        RubyRect rect = (RubyRect) ((RubyClass) recv).allocate();
         try {
             rect.x = buf.getInt();
             rect.y = buf.getInt();
             rect.width = buf.getInt();
             rect.height = buf.getInt();
         } catch (BufferUnderflowException e) {
+            throw recv.getRuntime().newArgumentError("not enough data");
         }
         return rect;
     }

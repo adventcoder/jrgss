@@ -2,7 +2,6 @@ package jrgss;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
-import org.jruby.RubyNumeric;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -43,17 +42,6 @@ public class RGSS {
     public static RubyBitmap asBitmap(IRubyObject obj) {
         if (obj instanceof RubyBitmap) return (RubyBitmap) obj;
         throw newTypeConversionError(obj, colorClass);
-    }
-
-    // Argument helpers
-
-    public static RubyRect rectFromArgs(IRubyObject[] args, int i, boolean useObjectSpace) {
-        RubyRect rect = new RubyRect(rectClass.getRuntime(), useObjectSpace);
-        rect.x = RubyNumeric.num2int(args[i++]);
-        rect.y = RubyNumeric.num2int(args[i++]);
-        rect.width = RubyNumeric.num2int(args[i++]);
-        rect.height = RubyNumeric.num2int(args[i++]);
-        return rect;
     }
 
     // Errors

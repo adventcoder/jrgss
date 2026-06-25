@@ -1,33 +1,11 @@
 package jrgss;
 
-import java.awt.Color;
-import java.awt.image.BufferedImage;
 import java.awt.image.Raster;
 import java.awt.image.WritableRaster;
 import java.util.Arrays;
 
-// hueChange requires a color model so is performed on the BufferedImage.
-// blurs are done at raster level, and assume the raster pixels have premultiplied alpha.
-public class ImageOps {
-    public static void hueChange(BufferedImage image, float dh) {
-        float[] hsb = new float[3];
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                int argb = image.getRGB(x, y);
-                int a = (argb >> 24) & 0xFF;
-                int r = (argb >> 16) & 0xFF;
-                int g = (argb >> 8) & 0xFF;
-                int b = argb & 0xFF;
-
-                Color.RGBtoHSB(r, g, b, hsb);
-                hsb[0] += dh;
-
-                int newRGB = Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]);
-                image.setRGB(x, y, (a << 24) | (newRGB & 0xFFFFFF));
-            }
-        }
-    }
-
+//NOTE: blurs are done at raster level, and assume premultiplied alpha for correctness
+public class RasterOps {
     public static void blurX(Raster src, WritableRaster dst, int radius) {
         double weight = 1.0f / (2*radius + 1);
         int[] pixel = new int[src.getNumBands()];
@@ -89,7 +67,7 @@ public class ImageOps {
         double[] cos = new double[divisions];
         double[] sin = new double[divisions];
         for (int d = 0; d < divisions; d++) {
-            double t = (d + 0.5) / divisions;
+            double t = ((double) d) / (divisions - 1);
             double rads = Math.toRadians(amplitude * (t - 0.5));
             cos[d] = Math.cos(rads);
             sin[d] = Math.sin(rads);
@@ -120,9 +98,8 @@ public class ImageOps {
     }
 
     private static int wrap(int i, int size) {
-        i = Math.floorMod(i, 2*size);
-        if (i >= size)
-            i = 2*size - i - 1;
+        if (i < 0) return -i - 1;
+        if (i >= size) return i = 2*size - i - 1;
         return i;
     }
 }

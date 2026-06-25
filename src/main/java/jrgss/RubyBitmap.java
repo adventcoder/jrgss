@@ -4,15 +4,15 @@ import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
-import java.awt.Rectangle;
+import java.awt.GraphicsConfiguration;
+import java.awt.GraphicsEnvironment;
 import java.awt.RenderingHints;
 import java.awt.TexturePaint;
+import java.awt.Transparency;
 import java.awt.image.BufferedImage;
-import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Iterator;
 
 import javax.imageio.IIOException;
@@ -20,7 +20,6 @@ import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
-import javax.imageio.plugins.bmp.BMPImageWriteParam;
 import javax.imageio.spi.ImageWriterSpi;
 import javax.imageio.stream.ImageOutputStream;
 
@@ -49,13 +48,8 @@ public class RubyBitmap extends RubyObject {
 
     @JRubyMethod
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
-        //NOTE: maybe the image format should be compatible with the screen? (or the window surface?)
-        // image = GraphicsEnvironment
-        //     .getLocalGraphicsEnvironment()
-        //     .getDefaultScreenDevice()
-        //     .getDefaultConfiguration()
-        //     .createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
-        image = new BufferedImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), BufferedImage.TYPE_INT_ARGB_PRE);
+        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        image = gc.createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
     }
 
     @JRubyMethod
@@ -69,21 +63,20 @@ public class RubyBitmap extends RubyObject {
             throw RGSS.newError(getRuntime(), "failed to create bitmap: " + ioe.getMessage());
         }
 
-        if (image.getType() != BufferedImage.TYPE_INT_ARGB_PRE) {
+        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        if (gc.getColorModel().isCompatibleRaster(image.getRaster())) {
+            image.coerceData(gc.getColorModel().isAlphaPremultiplied());
+        } else {
             BufferedImage oldImage = image;
-            image = new BufferedImage(oldImage.getWidth(), oldImage.getHeight(), BufferedImage.TYPE_INT_ARGB_PRE);
-            graphics = image.createGraphics();
+            image = gc.createCompatibleImage(oldImage.getWidth(), oldImage.getHeight(), Transparency.TRANSLUCENT);
+            createGraphics();
             graphics.drawImage(oldImage, 0, 0, null);
-            oldImage.flush();
         }
     }
 
     @JRubyMethod
     public void dispose() {
-        if (graphics != null) {
-            graphics.dispose();
-            graphics = null;
-        }
+        flushGraphics();
         image.flush();
         image = null;
     }
@@ -104,14 +97,22 @@ public class RubyBitmap extends RubyObject {
 
     public Graphics2D getGraphics() {
         checkDisposed();
-        if (graphics == null) {
-            graphics = image.createGraphics();
-            graphics.setRenderingHint(
-                RenderingHints.KEY_TEXT_ANTIALIASING,
-                RenderingHints.VALUE_TEXT_ANTIALIAS_ON
-            );
-        }
+        if (graphics == null)
+            createGraphics();
         return graphics;
+    }
+
+    private void createGraphics() {
+        graphics = image.createGraphics();
+        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    }
+
+    public void flushGraphics() {
+        if (graphics != null) {
+            graphics.dispose();
+            graphics = null;
+        }
     }
 
     @JRubyMethod
@@ -138,11 +139,11 @@ public class RubyBitmap extends RubyObject {
         int x = RubyNumeric.num2int(arg0);
         int y = RubyNumeric.num2int(arg1);
 
-        RubyColor color = new RubyColor(getRuntime());
+        int argb = 0;
         if ((x >= 0) && (y >= 0) && (x < image.getWidth()) && (y < image.getHeight()))
-            image.getRaster().getPixel(x, y, color.rgba);
+            argb = image.getRGB(x, y);
 
-        return color;
+        return new RubyColor(getRuntime(), argb);
     }
 
     @JRubyMethod
@@ -153,8 +154,17 @@ public class RubyBitmap extends RubyObject {
         RubyColor color = RGSS.asColor(arg2);
 
         if ((x >= 0) && (y >= 0) && (x < image.getWidth()) && (y < image.getHeight()))
-            image.getRaster().setPixel(x, y, color.rgba);
+            image.setRGB(x, y, color.getARGB());
+
         return color;
+    }
+
+    private RubyRect rectFromArgs(IRubyObject[] args, int i, boolean useObjectSpace) {
+        int x = RubyNumeric.num2int(args[i]);
+        int y = RubyNumeric.num2int(args[i + 1]);
+        int width = RubyNumeric.num2int(args[i + 2]);
+        int height = RubyNumeric.num2int(args[i + 3]);
+        return new RubyRect(getRuntime(), x, y, width, height, useObjectSpace);
     }
 
     @JRubyMethod
@@ -168,7 +178,7 @@ public class RubyBitmap extends RubyObject {
             clear_rect((RubyRect) args[0]);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 4, 4);
-            clear_rect(RGSS.rectFromArgs(args, 0, false));
+            clear_rect(rectFromArgs(args, 0, false));
         }
     }
 
@@ -184,14 +194,14 @@ public class RubyBitmap extends RubyObject {
             fill_rect(RGSS.asRect(args[0]), RGSS.asColor(args[1]));
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 5, 5);
-            fill_rect(RGSS.rectFromArgs(args, 0, false), RGSS.asColor(args[4]));
+            fill_rect(rectFromArgs(args, 0, false), RGSS.asColor(args[4]));
         }
     }
 
     public void fill_rect(RubyRect rect, RubyColor color) {
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.Src);
-        g.setColor(color.toAwtColor());
+        g.setColor(color.toJavaColor());
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
 
@@ -201,7 +211,7 @@ public class RubyBitmap extends RubyObject {
             gradient_fill_rect(RGSS.asRect(args[0]), RGSS.asColor(args[1]), RGSS.asColor(args[2]), args.length >= 4 ? args[3] : getRuntime().getFalse());
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 6, 7);
-            gradient_fill_rect(RGSS.rectFromArgs(args, 0, false), RGSS.asColor(args[4]), RGSS.asColor(args[5]), args.length >= 7 ? args[6] : getRuntime().getFalse());
+            gradient_fill_rect(rectFromArgs(args, 0, false), RGSS.asColor(args[4]), RGSS.asColor(args[5]), args.length >= 7 ? args[6] : getRuntime().getFalse());
         }
     }
 
@@ -210,13 +220,13 @@ public class RubyBitmap extends RubyObject {
         g.setComposite(AlphaComposite.Src);
         if (vertical.isTrue()) {
             g.setPaint(new GradientPaint(
-                rect.x, rect.y, color1.toAwtColor(),
-                rect.x, rect.y + rect.height - 1, color2.toAwtColor()
+                rect.x, rect.y, color1.toJavaColor(),
+                rect.x, rect.y + rect.height - 1, color2.toJavaColor()
             ));
         } else {
             g.setPaint(new GradientPaint(
-                rect.x, rect.y, color1.toAwtColor(),
-                rect.x + rect.width - 1, rect.y, color2.toAwtColor()
+                rect.x, rect.y, color1.toJavaColor(),
+                rect.x + rect.width - 1, rect.y, color2.toJavaColor()
             ));
         }
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
@@ -225,37 +235,27 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void blt(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, 4, 5);
-        int x = RubyNumeric.num2int(args[0]);
-        int y = RubyNumeric.num2int(args[1]);
-        RubyBitmap src = RGSS.asBitmap(args[2]);
-        RubyRect srcRect = RGSS.asRect(args[3]);
-        int opacity = args.length >= 5 ? RubyNumeric.num2int(args[4]) : 255;
+        blt(RubyNumeric.num2int(args[0]), RubyNumeric.num2int(args[1]), RGSS.asBitmap(args[2]), RGSS.asRect(args[3]), args.length >= 5 ? RubyNumeric.num2int(args[4]) : 255);
+    }
 
-        if (opacity < 0 || opacity > 255 || src.isDisposed()) return;
-
-        Graphics2D g = getGraphics();
-        g.setComposite(AlphaComposite.SrcOver.derive(opacity / 255.0f));
-        g.drawImage(src.image,
-            x, y, x + srcRect.width, y + srcRect.height,
-            srcRect.x, srcRect.y, srcRect.x + srcRect.width, srcRect.y + srcRect.height,
-            null
-        );
+    public void blt(int x, int y, RubyBitmap src, RubyRect srcRect, int opacity) {
+        RubyRect dstRect = new RubyRect(getRuntime(), x, y, srcRect.width, srcRect.height, false);
+        stretch_blt(dstRect, src, srcRect, opacity);
     }
 
     @JRubyMethod(rest = true)
     public void stretch_blt(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, 3, 4);
-        RubyRect rect = RGSS.asRect(args[0]);
-        RubyBitmap src = RGSS.asBitmap(args[1]);
-        RubyRect srcRect = RGSS.asRect(args[2]);
-        int opacity = args.length >= 4 ? RubyNumeric.num2int(args[3]) : 255;
+        stretch_blt(RGSS.asRect(args[0]), RGSS.asBitmap(args[1]), RGSS.asRect(args[2]), args.length >= 4 ? RubyNumeric.num2int(args[3]) : 255);
+    }
 
+    public void stretch_blt(RubyRect dstRect, RubyBitmap src, RubyRect srcRect, int opacity) {
         if (opacity < 0 || opacity > 255 || src.isDisposed()) return;
 
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.SrcOver.derive(opacity / 255.0f));
         g.drawImage(src.image,
-            rect.x, rect.y, rect.x + rect.width, rect.y + rect.height,
+            dstRect.x, dstRect.y, dstRect.x + dstRect.width, dstRect.y + dstRect.height,
             srcRect.x, srcRect.y, srcRect.x + srcRect.width, srcRect.y + srcRect.height,
             null
         );
@@ -264,16 +264,15 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void tile_blt(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, 3, 4);
-        RubyRect rect = RGSS.asRect(args[0]);
-        RubyBitmap src = RGSS.asBitmap(args[1]);
-        RubyRect srcRect = RGSS.asRect(args[2]);
-        int opacity = args.length >= 4 ? RubyNumeric.num2int(args[3]) : 255;
+        tile_blt(RGSS.asRect(args[0]), RGSS.asBitmap(args[1]), RGSS.asRect(args[2]), args.length >= 4 ? RubyNumeric.num2int(args[3]) : 255);
+    }
 
+    public void tile_blt(RubyRect rect, RubyBitmap src, RubyRect srcRect, int opacity) {
         if (opacity < 0 || opacity > 255 || src.isDisposed()) return;
 
         Graphics2D g = getGraphics();
-        g.setComposite(AlphaComposite.SrcOver.derive(opacity / 255.0f));
-        g.setPaint(new TexturePaint(src.image, new Rectangle(srcRect.x, srcRect.y, srcRect.width, srcRect.height)));
+        g.setComposite(AlphaComposite.Src.derive(opacity / 255.0f));
+        g.setPaint(new TexturePaint(src.image, srcRect.toJavaRectangle()));
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
 
@@ -283,7 +282,7 @@ public class RubyBitmap extends RubyObject {
             draw_text(RGSS.asRect(args[0]), args[1], args.length >= 3 ? RubyNumeric.num2int(args[2]) : 0);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 5, 6);
-            draw_text(RGSS.rectFromArgs(args, 0, false), args[4], args.length >= 6 ? RubyNumeric.num2int(args[5]) : 0);
+            draw_text(rectFromArgs(args, 0, false), args[4], args.length >= 6 ? RubyNumeric.num2int(args[5]) : 0);
         }
     }
 
@@ -302,40 +301,53 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod
     public void hue_change(IRubyObject arg) {
         checkDisposed();
-        int angle = RubyNumeric.num2int(arg);
-        ImageOps.hueChange(image, angle / 360.f);
+        float dh = RubyNumeric.num2int(arg) / 360.f;
+        float[] hsb = new float[3];
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                int argb = image.getRGB(x, y);
+                int a = (argb >> 24) & 0xFF;
+                int r = (argb >> 16) & 0xFF;
+                int g = (argb >> 8) & 0xFF;
+                int b = argb & 0xFF;
+
+                Color.RGBtoHSB(r, g, b, hsb);
+                hsb[0] += dh;
+
+                int newRGB = Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]);
+                image.setRGB(x, y, (a << 24) | (newRGB & 0xFFFFFF));
+            }
+        }
     }
 
     @JRubyMethod(optional = 1)
     public void blur(IRubyObject... args) {
         checkDisposed();
         int radius = args.length >= 1 ? RubyNumeric.num2int(args[0]) : 1;
-        if (radius == 0) return;
+        if (radius <= 0 || radius > image.getWidth() || radius > image.getHeight()) return;
 
-        WritableRaster raster = image.getRaster();
-        //NOTE: we could cache the scratch raster
-        WritableRaster scratchRaster = raster.createCompatibleWritableRaster();
-        ImageOps.blurX(raster, scratchRaster, radius);
-        ImageOps.blurY(scratchRaster, raster, radius);
+        //NOTE: we could cache the temp raster
+        WritableRaster temp = image.getRaster().createCompatibleWritableRaster();
+        RasterOps.blurX(image.getRaster(), temp, radius);
+        RasterOps.blurY(temp, image.getRaster(), radius);
     }
 
     @JRubyMethod
     public void radial_blur(IRubyObject arg0, IRubyObject arg1) {
         checkDisposed();
         int amplitude = RubyNumeric.num2int(arg0);
-        if (amplitude <= 0) return;
         int divisions = Math.min(Math.max(RubyNumeric.num2int(arg1), 2), 100);
+        if (amplitude <= 0) return;
 
-        WritableRaster raster = image.getRaster();
-        //NOTE: we could cache the scratch raster
-        //NOTE: we could also pad here, instead of wrapping inside the loop
-        WritableRaster scratchRaster = raster.createCompatibleWritableRaster();
-        scratchRaster.setRect(raster);
-        ImageOps.radialBlur(scratchRaster, raster, amplitude, divisions);
+        //NOTE: we could cache the temp raster
+        WritableRaster tempRaster = image.getRaster().createCompatibleWritableRaster();
+        image.copyData(tempRaster);
+        RasterOps.radialBlur(tempRaster, image.getRaster(), amplitude, divisions);
     }
 
     @JRubyMethod
     public void save(IRubyObject arg) {
+        //NOTE: we could support a background color option for bmp and jpg.
         String path = arg.asJavaString();
         JRubyFile file = new JRubyFile(getRuntime().getCurrentDirectory(), path);
 
@@ -363,7 +375,7 @@ public class RubyBitmap extends RubyObject {
                 throw new IIOException("Can't create ImageOutputStream!");
 
             ImageWriteParam param = writer.getDefaultWriteParam();
-            // we could parse a ruby opts hash into params here, e.g. quality
+            //NOTE: we could parse a ruby opts hash into params here, e.g. quality
 
             writer.setOutput(ios);
             writer.write(null, new IIOImage(image, null, null), param);

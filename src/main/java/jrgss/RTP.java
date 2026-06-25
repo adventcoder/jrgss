@@ -7,7 +7,10 @@ import org.jruby.util.JRubyFile;
 
 public class RTP {
     public static File findFile(Ruby runtime, String path) {
-        return findFileAt(runtime.getCurrentDirectory(), path);
+        File file = findFileAt(runtime.getCurrentDirectory(), path);
+        if (file != null) return file;
+        //IMPL: RPG Maker would show an error message box and exit here instead of raising
+        throw RGSS.newError(runtime, "Unable to find file: " + path);
     }
  
     private static File findFileAt(String cwd, String path) {
@@ -22,7 +25,7 @@ public class RTP {
             int dotIndex = entry.lastIndexOf('.');
             if (dotIndex <= 0) continue;
 
-            JRubyFile candidateWithoutExt = new JRubyFile(parent.getPath(), entry.substring(dotIndex));
+            JRubyFile candidateWithoutExt = new JRubyFile(parent.getPath(), entry.substring(0, dotIndex));
             if (candidateWithoutExt.equals(file)) {
                 JRubyFile candidate = new JRubyFile(parent.getPath(), entry);
                 if (!candidate.isFile()) continue;
