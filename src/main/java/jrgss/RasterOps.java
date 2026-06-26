@@ -63,6 +63,7 @@ public class RasterOps {
     public static void radialBlur(Raster src, WritableRaster dst, int amplitude, int divisions) {
         double originX = src.getWidth() * 0.5;
         double originY = src.getHeight() * 0.5;
+        double weight = 1.0 / divisions;
 
         double[] cos = new double[divisions];
         double[] sin = new double[divisions];
@@ -73,7 +74,6 @@ public class RasterOps {
             sin[d] = Math.sin(rads);
         }
 
-        double weight = 1.0 / divisions;
         int[] pixel = new int[src.getNumBands()];
         double newPixel[] = new double[pixel.length];
 
@@ -84,10 +84,10 @@ public class RasterOps {
                 double dx = x + 0.5 - originX;
                 double dy = y + 0.5 - originY;
                 for (int d = 0; d < divisions; d++) {
-                    int newX = (int) Math.floor(dx*cos[d] - dy*sin[d] + originX);
-                    int newY = (int) Math.floor(dx*sin[d] + dy*cos[d] + originY);
+                    double newX = dx*cos[d] - dy*sin[d] + originX;
+                    double newY = dx*sin[d] + dy*cos[d] + originY;
 
-                    src.getPixel(wrap(newX, src.getWidth()), wrap(newY, src.getHeight()), pixel);
+                    samplePixel(src, newX, newY, pixel);
                     for (int i = 0; i < pixel.length; i++)
                         newPixel[i] += pixel[i]*weight;
                 }
@@ -97,9 +97,15 @@ public class RasterOps {
         }
     }
 
+    private static void samplePixel(Raster src, double x, double y, int[] pixel) {
+        int srcX = wrap((int) Math.floor(x), src.getWidth());
+        int srcY = wrap((int) Math.floor(y), src.getHeight());
+        src.getPixel(srcX, srcY, pixel);
+    }
+
     private static int wrap(int i, int size) {
         if (i < 0) return -i - 1;
-        if (i >= size) return i = 2*size - i - 1;
+        if (i >= size) return 2*size - i - 1;
         return i;
     }
 }

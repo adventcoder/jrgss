@@ -1,4 +1,12 @@
 .vscode/
 target/
+
 test/*
 !test/.gitkeep
+
+Graphics/
+Data/
+System/
+Game.exe
+Game.ini
+Game.rvproj2

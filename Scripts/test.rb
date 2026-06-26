@@ -15,8 +15,7 @@ yellow = Color.new(255, 255, 0)
 b.fill_rect(b.rect, black)
 b.gradient_fill_rect(2, 2, 96, 96, blue, yellow, true)
 b.stretch_blt(Rect.new(10, 10, 80, 80), img, img.rect)
-b.blur(5)
 
-#b.draw_text(2, 2, 96, 96, "Hello")
+b.draw_text(2, 2, 96, 96, "Hello", 1)
 
 b.save('test/a.png')

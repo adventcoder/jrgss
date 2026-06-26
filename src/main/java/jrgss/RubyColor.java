@@ -33,12 +33,29 @@ public class RubyColor extends RubyObject {
         super(runtime, metaClass);
     }
 
-    public RubyColor(Ruby runtime, int argb) {
+    public RubyColor(Ruby runtime, RubyClass metaClass, double red, double green, double blue, double alpha) {
         this(runtime, RGSS.colorClass);
-        this.alpha = (argb >> 24) & 0xFF;
-        this.red = (argb >> 16) & 0xFF;
-        this.green = (argb >> 8) & 0xFF;
-        this.blue = argb & 0xFF;
+        this.red = red;
+        this.green = green;
+        this.blue = blue;
+        this.alpha = alpha;
+    }
+
+    public static RubyColor newColor(Ruby runtime, double r, double g, double b, double a) {
+        return new RubyColor(runtime, RGSS.colorClass, r, g, b, a);
+    }
+
+    public static RubyColor newColor(Ruby runtime, double r, double g, double b) {
+        return newColor(runtime, r, g, b, 255);
+    }
+
+    public static RubyColor newColor(Ruby runtime, int argb) {
+        //NOTE: caching?
+        int a = (argb >> 24) & 0xFF;
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >> 8) & 0xFF;
+        int b = argb & 0xFF;
+        return new RubyColor(runtime, RGSS.colorClass, r, g, b, a);
     }
 
     public int getARGB() {
@@ -153,12 +170,14 @@ public class RubyColor extends RubyObject {
 
     private IRubyObject set(IRubyObject obj) {
         if (obj == this) return this;
-        if (!(obj instanceof RubyColor color))
+        if (obj instanceof RubyColor color) {
+            this.red = color.red;
+            this.green = color.green;
+            this.blue = color.blue;
+            this.alpha = color.alpha;
+        } else {
             throw obj.getRuntime().newTypeError(obj, RGSS.colorClass);
-        this.red = color.red;
-        this.green = color.green;
-        this.blue = color.blue;
-        this.alpha = color.alpha;
+        }
         return this;
     }
 
@@ -218,6 +237,6 @@ public class RubyColor extends RubyObject {
         int rgb = Color.HSBtoRGB((float) (hue / 360.0), (float) (saturation / 255.0), (float) (brightness / 255.0));
         int a = (int) (alpha + 0.5);
 
-        return new RubyColor(recv.getRuntime(), (a << 24) | (rgb & 0xFFFFFF));
+        return RubyColor.newColor(recv.getRuntime(), (a << 24) | (rgb & 0xFFFFFF));
     }
 }

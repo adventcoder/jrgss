@@ -33,16 +33,29 @@ public class RubyRect extends RubyObject {
         super(runtime, metaClass);
     }
 
-    public RubyRect(Ruby runtime, int x, int y, int width, int height, boolean useObjectSpace) {
-        super(runtime, RGSS.rectClass, useObjectSpace);
+    public RubyRect(Ruby runtime, RubyClass metaClass, int x, int y, int width, int height, boolean objectSpace) {
+        super(runtime, metaClass, objectSpace);
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
     }
 
-    public RubyRect(Ruby runtime, int x, int y, int width, int height) {
-        this(runtime, x, y, width, height, true);
+    public static RubyRect newRect(Ruby runtime, int x, int y, int width, int height) {
+        return new RubyRect(runtime, RGSS.rectClass, x, y, width, height, true);
+    }
+
+    public static RubyRect newRectLight(Ruby runtime, int x, int y, int width, int height) {
+        return new RubyRect(runtime, RGSS.rectClass, x, y, width, height, false);
+    }
+
+    public static RubyRect newRectLight(Ruby runtime, IRubyObject[] args, int i) {
+        return newRectLight(runtime,
+            RubyNumeric.num2int(args[i]),
+            RubyNumeric.num2int(args[i + 1]),
+            RubyNumeric.num2int(args[i + 2]),
+            RubyNumeric.num2int(args[i + 3])
+        );
     }
 
     @JRubyMethod
@@ -125,12 +138,14 @@ public class RubyRect extends RubyObject {
     }
 
     private IRubyObject set(IRubyObject obj) {
-        if (!(obj instanceof RubyRect rect))
+        if (obj instanceof RubyRect rect) {
+            this.x = rect.x;
+            this.y = rect.y;
+            this.width = rect.width;
+            this.height = rect.height;
+        } else {
             throw obj.getRuntime().newTypeError(obj, RGSS.rectClass);
-        this.x = rect.x;
-        this.y = rect.y;
-        this.width = rect.width;
-        this.height = rect.height;
+        }
         return this;
     }
 

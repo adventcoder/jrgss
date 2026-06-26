@@ -2,6 +2,7 @@ package jrgss;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.FontMetrics;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
@@ -41,6 +42,7 @@ public class RubyBitmap extends RubyObject {
 
     private BufferedImage image;
     private Graphics2D graphics;
+    private RubyFont font;
 
     public RubyBitmap(Ruby runtime, RubyClass metaClass) {
         super(runtime, metaClass);
@@ -50,6 +52,7 @@ public class RubyBitmap extends RubyObject {
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
         GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         image = gc.createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
+        initializeCommon();
     }
 
     @JRubyMethod
@@ -72,6 +75,23 @@ public class RubyBitmap extends RubyObject {
             createGraphics();
             graphics.drawImage(oldImage, 0, 0, null);
         }
+
+        initializeCommon();
+    }
+
+    private void initializeCommon() {
+        font = RubyFont.newFont(getRuntime());
+    }
+
+    @JRubyMethod
+    public IRubyObject font() {
+        return font;
+    }
+
+    @JRubyMethod(name = "font=")
+    public IRubyObject font_set(IRubyObject obj) {
+        this.font = RGSS.asFont(obj);
+        return obj;
     }
 
     @JRubyMethod
@@ -105,6 +125,7 @@ public class RubyBitmap extends RubyObject {
     private void createGraphics() {
         graphics = image.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        // graphics.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_DEFAULT);
         graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
     }
 
@@ -130,7 +151,7 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod
     public IRubyObject rect() {
         checkDisposed();
-        return new RubyRect(getRuntime(), 0, 0, image.getWidth(), image.getHeight());
+        return RubyRect.newRect(getRuntime(), 0, 0, image.getWidth(), image.getHeight());
     }
 
     @JRubyMethod
@@ -143,7 +164,7 @@ public class RubyBitmap extends RubyObject {
         if ((x >= 0) && (y >= 0) && (x < image.getWidth()) && (y < image.getHeight()))
             argb = image.getRGB(x, y);
 
-        return new RubyColor(getRuntime(), argb);
+        return RubyColor.newColor(getRuntime(), argb);
     }
 
     @JRubyMethod
@@ -159,14 +180,6 @@ public class RubyBitmap extends RubyObject {
         return color;
     }
 
-    private RubyRect rectFromArgs(IRubyObject[] args, int i, boolean useObjectSpace) {
-        int x = RubyNumeric.num2int(args[i]);
-        int y = RubyNumeric.num2int(args[i + 1]);
-        int width = RubyNumeric.num2int(args[i + 2]);
-        int height = RubyNumeric.num2int(args[i + 3]);
-        return new RubyRect(getRuntime(), x, y, width, height, useObjectSpace);
-    }
-
     @JRubyMethod
     public void clear() {
         clear_rect(rect());
@@ -178,7 +191,7 @@ public class RubyBitmap extends RubyObject {
             clear_rect((RubyRect) args[0]);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 4, 4);
-            clear_rect(rectFromArgs(args, 0, false));
+            clear_rect(RubyRect.newRectLight(getRuntime(), args, 0));
         }
     }
 
@@ -194,7 +207,7 @@ public class RubyBitmap extends RubyObject {
             fill_rect(RGSS.asRect(args[0]), RGSS.asColor(args[1]));
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 5, 5);
-            fill_rect(rectFromArgs(args, 0, false), RGSS.asColor(args[4]));
+            fill_rect(RubyRect.newRectLight(getRuntime(), args, 0), RGSS.asColor(args[4]));
         }
     }
 
@@ -211,7 +224,7 @@ public class RubyBitmap extends RubyObject {
             gradient_fill_rect(RGSS.asRect(args[0]), RGSS.asColor(args[1]), RGSS.asColor(args[2]), args.length >= 4 ? args[3] : getRuntime().getFalse());
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 6, 7);
-            gradient_fill_rect(rectFromArgs(args, 0, false), RGSS.asColor(args[4]), RGSS.asColor(args[5]), args.length >= 7 ? args[6] : getRuntime().getFalse());
+            gradient_fill_rect(RubyRect.newRectLight(getRuntime(), args, 0), RGSS.asColor(args[4]), RGSS.asColor(args[5]), args.length >= 7 ? args[6] : getRuntime().getFalse());
         }
     }
 
@@ -239,7 +252,7 @@ public class RubyBitmap extends RubyObject {
     }
 
     public void blt(int x, int y, RubyBitmap src, RubyRect srcRect, int opacity) {
-        RubyRect dstRect = new RubyRect(getRuntime(), x, y, srcRect.width, srcRect.height, false);
+        RubyRect dstRect = RubyRect.newRectLight(getRuntime(), x, y, srcRect.width, srcRect.height);
         stretch_blt(dstRect, src, srcRect, opacity);
     }
 
@@ -282,20 +295,45 @@ public class RubyBitmap extends RubyObject {
             draw_text(RGSS.asRect(args[0]), args[1], args.length >= 3 ? RubyNumeric.num2int(args[2]) : 0);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 5, 6);
-            draw_text(rectFromArgs(args, 0, false), args[4], args.length >= 6 ? RubyNumeric.num2int(args[5]) : 0);
+            draw_text(RubyRect.newRectLight(getRuntime(), args, 0), args[4], args.length >= 6 ? RubyNumeric.num2int(args[5]) : 0);
         }
     }
 
     public void draw_text(RubyRect rect, IRubyObject obj, int align) {
         String str = obj.asString().asJavaString();
-        //TODO
+
+        //TODO: font caching
+        graphics.setFont(font.toJavaFont(graphics));
+        FontMetrics fm = graphics.getFontMetrics();
+
+        int strWidth = fm.stringWidth(str);
+        //TODO: try to scale horizontally if text is too wide
+        //TODO: font shadow
+        //TODO: font outline
+
+        int strY = rect.y + Math.max(rect.height - fm.getHeight(), 0) / 2;
+        int strX = rect.x + switch (align) {
+            case 1 -> Math.max(rect.width - strWidth, 0) / 2;
+            case 2 -> Math.max(rect.width - strWidth, 0);
+            default -> 0;
+        };
+
+        graphics.setComposite(AlphaComposite.SrcOver);
+        graphics.setColor(font.color.toJavaColor());
+        graphics.setClip(rect.x, rect.y, rect.width, rect.height);
+        graphics.drawString(str, strX, strY + fm.getAscent());
+        graphics.setClip(null);
     }
 
     @JRubyMethod
     public IRubyObject text_size(IRubyObject obj) {
         String str = obj.asString().asJavaString();
-        //TODO
-        return getRuntime().getNil();
+
+        //TODO: font caching
+        graphics.setFont(font.toJavaFont(graphics));
+        FontMetrics fm = graphics.getFontMetrics();
+
+        return RubyRect.newRect(getRuntime(), 0, 0, fm.stringWidth(str), (int) font.size);
     }
 
     @JRubyMethod
