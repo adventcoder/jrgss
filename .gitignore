@@ -4,8 +4,10 @@ target/
 test/*
 !test/.gitkeep
 
-Graphics/
+Audio/
 Data/
+Fonts/
+Graphics/
 System/
 Game.exe
 Game.ini
