@@ -1,15 +1,20 @@
 package jrgss;
 
 import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.awt.TexturePaint;
 import java.awt.Transparency;
+import java.awt.font.GlyphVector;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
 import java.io.File;
@@ -33,6 +38,7 @@ import org.jruby.runtime.Arity;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.JRubyFile;
 
+//TODO: initialize_copy?
 public class RubyBitmap extends RubyObject {
     public static RubyClass createBitmapClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Bitmap", runtime.getObject(), RubyBitmap::new);
@@ -125,8 +131,9 @@ public class RubyBitmap extends RubyObject {
     private void createGraphics() {
         graphics = image.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        // graphics.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_DEFAULT);
+        graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        //graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
     }
 
     public void flushGraphics() {
@@ -302,27 +309,52 @@ public class RubyBitmap extends RubyObject {
     public void draw_text(RubyRect rect, IRubyObject obj, int align) {
         String str = obj.asString().asJavaString();
 
+        Graphics2D g = getGraphics();
+        g.setComposite(AlphaComposite.SrcOver);
+        g.setClip(rect.x, rect.y, rect.width, rect.height);
+
         //TODO: font caching
-        graphics.setFont(font.toJavaFont(graphics));
-        FontMetrics fm = graphics.getFontMetrics();
-
-        int strWidth = fm.stringWidth(str);
-        //TODO: try to scale horizontally if text is too wide
         //TODO: font shadow
-        //TODO: font outline
+        Font javaFont = font.toJavaFont(g);
 
-        int strY = rect.y + Math.max(rect.height - fm.getHeight(), 0) / 2;
-        int strX = rect.x + switch (align) {
-            case 1 -> Math.max(rect.width - strWidth, 0) / 2;
-            case 2 -> Math.max(rect.width - strWidth, 0);
-            default -> 0;
-        };
+        if (font.outline) {
+            GlyphVector gv = javaFont.createGlyphVector(g.getFontRenderContext(), str);
+            Rectangle lb = gv.getLogicalBounds().getBounds();
 
-        graphics.setComposite(AlphaComposite.SrcOver);
-        graphics.setColor(font.color.toJavaColor());
-        graphics.setClip(rect.x, rect.y, rect.width, rect.height);
-        graphics.drawString(str, strX, strY + fm.getAscent());
-        graphics.setClip(null);
+            int x = rect.x + switch (align) {
+                case 1 -> Math.max(rect.width - lb.width, 0) / 2;
+                case 2 -> Math.max(rect.width - lb.width, 0);
+                default -> 0;
+            };
+            int y = rect.y + Math.max(rect.height - lb.height, 0) / 2;
+
+            Shape shape = gv.getOutline(x, y - lb.y);
+
+            g.setColor(font.outColor.toJavaColor());
+            g.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.draw(shape);
+
+            g.setColor(font.color.toJavaColor());
+            g.fill(shape);
+        } else {
+
+            g.setFont(javaFont);
+            FontMetrics fm = g.getFontMetrics();
+            int width = fm.stringWidth(str);
+            int height = fm.getHeight();
+
+            int x = rect.x + switch (align) {
+                case 1 -> Math.max(rect.width - width, 0) / 2;
+                case 2 -> Math.max(rect.width - width, 0);
+                default -> 0;
+            };
+            int y = rect.y + Math.max(rect.height - height, 0) / 2;
+
+            g.setColor(font.color.toJavaColor());
+            g.drawString(str, x, y + fm.getAscent());
+        }
+
+        g.setClip(null);
     }
 
     @JRubyMethod
@@ -332,6 +364,9 @@ public class RubyBitmap extends RubyObject {
         //TODO: font caching
         graphics.setFont(font.toJavaFont(graphics));
         FontMetrics fm = graphics.getFontMetrics();
+
+        // Because of rounding errors fm.getHeight() could be a pixel off from font.size.
+        // So just use font.size instead.
 
         return RubyRect.newRect(getRuntime(), 0, 0, fm.stringWidth(str), (int) font.size);
     }

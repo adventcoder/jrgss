@@ -3,6 +3,7 @@ package jrgss;
 import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.FontFormatException;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
@@ -25,6 +26,9 @@ import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.JRubyFile;
+
+import jnr.ffi.Struct.caddr_t;
 
 public class RubyFont extends RubyObject {
     private static RubyFont defaultFont;
@@ -39,7 +43,7 @@ public class RubyFont extends RubyObject {
 
     private static void initDefaultFont(Ruby runtime) {
         defaultFont = new RubyFont(runtime, RGSS.fontClass, false);
-        defaultFont.name = runtime.newString(Font.SANS_SERIF);
+        defaultFont.name = runtime.newString("VL Gothic");
         defaultFont.size = 24;
         defaultFont.bold = false;
         defaultFont.italic = false;
@@ -198,7 +202,7 @@ public class RubyFont extends RubyObject {
     @JRubyMethod(name = "exist?", meta = true)
     public static IRubyObject exist_p(IRubyObject recv, IRubyObject obj) {
         String name = obj.asString().asJavaString();
-        Font font = new Font(name, Font.PLAIN, 16);
+        Font font = new Font(name, Font.PLAIN, 1);
         return font.getFamily().equals(name) ? recv.getRuntime().getTrue() : recv.getRuntime().getFalse();
     }
 
@@ -210,6 +214,8 @@ public class RubyFont extends RubyObject {
         if (bold) style |= Font.BOLD;
         if (italic) style |= Font.ITALIC;
 
+        // Make an initial guess at font size using dpi = 96.
+        // It's not worth trying to determine the correct dpi due to inaccuracies and we rescale anyway.
         Font font = new Font(nameAsString, style, (int) (size*0.75));
         FontMetrics metrics = graphics.getFontMetrics(font);
 
@@ -268,15 +274,5 @@ public class RubyFont extends RubyObject {
         graphics.dispose();
 
         ImageIO.write(image, "png", new File("test/b.png"));
-    }
-
-    private static double toPoints(double size) {
-        int dpi;
-        try {
-            dpi = Toolkit.getDefaultToolkit().getScreenResolution();
-        } catch (HeadlessException e) {
-            dpi = 96;
-        }
-        return size * 72 / dpi;
     }
 }
