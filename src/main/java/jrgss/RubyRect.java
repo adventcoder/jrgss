@@ -33,29 +33,43 @@ public class RubyRect extends RubyObject {
         super(runtime, metaClass);
     }
 
-    public RubyRect(Ruby runtime, RubyClass metaClass, int x, int y, int width, int height, boolean objectSpace) {
-        super(runtime, metaClass, objectSpace);
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
+    public RubyRect(Ruby runtime, RubyClass metaClass, boolean useObjectSpace) {
+        super(runtime, metaClass, useObjectSpace);
+    }
+
+    public RubyRect(Ruby runtime, boolean useObjectSpace) {
+        super(runtime, RGSS.rectClass, useObjectSpace);
     }
 
     public static RubyRect newRect(Ruby runtime, int x, int y, int width, int height) {
-        return new RubyRect(runtime, RGSS.rectClass, x, y, width, height, true);
+        RubyRect rect = new RubyRect(runtime, true);
+        rect.x = x;
+        rect.y = y;
+        rect.width = width;
+        rect.height = height;
+        return rect;
     }
 
     public static RubyRect newRectLight(Ruby runtime, int x, int y, int width, int height) {
-        return new RubyRect(runtime, RGSS.rectClass, x, y, width, height, false);
+        RubyRect rect = new RubyRect(runtime, false);
+        rect.x = x;
+        rect.y = y;
+        rect.width = width;
+        rect.height = height;
+        return rect;
     }
 
     public static RubyRect newRectLight(Ruby runtime, IRubyObject[] args, int i) {
-        return newRectLight(runtime,
-            RubyNumeric.num2int(args[i]),
-            RubyNumeric.num2int(args[i + 1]),
-            RubyNumeric.num2int(args[i + 2]),
-            RubyNumeric.num2int(args[i + 3])
-        );
+        RubyRect rect = new RubyRect(runtime, false);
+        rect.x = RubyNumeric.num2int(args[i]);
+        rect.y = RubyNumeric.num2int(args[i + 1]);
+        rect.width = RubyNumeric.num2int(args[i + 2]);
+        rect.height = RubyNumeric.num2int(args[i + 3]);
+        return rect;
+    }
+
+    public Rectangle getRectangle() {
+        return new Rectangle(x, y, width, height);
     }
 
     @JRubyMethod
@@ -75,31 +89,7 @@ public class RubyRect extends RubyObject {
 
     @JRubyMethod
     public IRubyObject height() {
-        return RubyNumeric.int2fix(getRuntime(), width);
-    }
-
-    @JRubyMethod(name = "x=")
-    public IRubyObject x_set(IRubyObject obj) {
-        this.x = RubyNumeric.num2int(obj);
-        return obj;
-    }
-
-    @JRubyMethod(name = "y=")
-    public IRubyObject y_set(IRubyObject obj) {
-        this.y = RubyNumeric.num2int(obj);
-        return obj;
-    }
-
-    @JRubyMethod(name = "width=")
-    public IRubyObject width_set(IRubyObject obj) {
-        this.width = RubyNumeric.num2int(obj);
-        return obj;
-    }
-
-    @JRubyMethod(name = "height=")
-    public IRubyObject height_set(IRubyObject obj) {
-        this.height = RubyNumeric.num2int(obj);
-        return obj;
+        return RubyNumeric.int2fix(getRuntime(), height);
     }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
@@ -150,21 +140,41 @@ public class RubyRect extends RubyObject {
     }
 
     private IRubyObject set(IRubyObject x, IRubyObject y, IRubyObject width, IRubyObject height) {
-        x_set(x);
-        y_set(y);
-        width_set(width);
-        height_set(height);
+        set_x(x);
+        set_y(y);
+        set_width(width);
+        set_height(height);
         return this;
+    }
+
+    @JRubyMethod(name = "x=")
+    public IRubyObject set_x(IRubyObject obj) {
+        this.x = RubyNumeric.num2int(obj);
+        return obj;
+    }
+
+    @JRubyMethod(name = "y=")
+    public IRubyObject set_y(IRubyObject obj) {
+        this.y = RubyNumeric.num2int(obj);
+        return obj;
+    }
+
+    @JRubyMethod(name = "width=")
+    public IRubyObject set_width(IRubyObject obj) {
+        this.width = RubyNumeric.num2int(obj);
+        return obj;
+    }
+
+    @JRubyMethod(name = "height=")
+    public IRubyObject set_height(IRubyObject obj) {
+        this.height = RubyNumeric.num2int(obj);
+        return obj;
     }
 
     @JRubyMethod
     @Override
     public IRubyObject to_s() {
         return getRuntime().newString(String.format("(%d, %d, %d, %d)", x, y, width, height));
-    }
-
-    public Rectangle toJavaRectangle() {
-        return new Rectangle(x, y, width, height);
     }
 
     @JRubyMethod(name = "==", required = 1)

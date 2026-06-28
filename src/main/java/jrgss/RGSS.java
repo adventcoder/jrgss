@@ -32,18 +32,13 @@ public class RGSS {
         return superClass.getRuntime().defineClass(name, superClass, superClass.getAllocator());
     }
 
-    // Argument Helpers
+    // Argument Checking
 
     public static double checkRange(IRubyObject obj, String name, double min, double max) {
         double val = RubyNumeric.num2dbl(obj);
         if (val < min || val > max)
             throw obj.getRuntime().newArgumentError("bad value for " + name + " (" + val + " not between " + min + " and " + max + ")");
         return val;
-    }
-
-    //TODO: use this
-    public static double clampRange(IRubyObject obj, double min, double max) {
-        return Math.min(Math.max(RubyNumeric.num2dbl(obj), min), max);
     }
 
     // Type Checking

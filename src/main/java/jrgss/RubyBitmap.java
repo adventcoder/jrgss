@@ -1,7 +1,6 @@
 package jrgss;
 
 import java.awt.AlphaComposite;
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -16,6 +15,7 @@ import java.awt.TexturePaint;
 import java.awt.Transparency;
 import java.awt.font.GlyphVector;
 import java.awt.image.BufferedImage;
+import java.awt.image.ColorModel;
 import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
@@ -35,10 +35,10 @@ import org.jruby.RubyNumeric;
 import org.jruby.RubyObject;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.JRubyFile;
 
-//TODO: initialize_copy?
 public class RubyBitmap extends RubyObject {
     public static RubyClass createBitmapClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Bitmap", runtime.getObject(), RubyBitmap::new);
@@ -52,13 +52,14 @@ public class RubyBitmap extends RubyObject {
 
     public RubyBitmap(Ruby runtime, RubyClass metaClass) {
         super(runtime, metaClass);
+        font = new RubyFont(runtime);
     }
 
     @JRubyMethod
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
         GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         image = gc.createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
-        initializeCommon();
+        font.initialize(new IRubyObject[0]);
     }
 
     @JRubyMethod
@@ -82,22 +83,25 @@ public class RubyBitmap extends RubyObject {
             graphics.drawImage(oldImage, 0, 0, null);
         }
 
-        initializeCommon();
+        font.initialize(new IRubyObject[0]);
     }
 
-    private void initializeCommon() {
-        font = RubyFont.newFont(getRuntime());
+    @JRubyMethod(visibility = Visibility.PRIVATE)
+    @Override
+    public IRubyObject initialize_copy(IRubyObject orig) {
+        if (orig == this) return this;
+        if (orig instanceof RubyBitmap other) {
+            image = other.copyImage();
+            flushGraphics();
+            font.initialize_copy(other.font);
+        } else {
+            throw getRuntime().newTypeError(orig, RGSS.bitmapClass);
+        }
+        return this;
     }
 
-    @JRubyMethod
-    public IRubyObject font() {
-        return font;
-    }
-
-    @JRubyMethod(name = "font=")
-    public IRubyObject font_set(IRubyObject obj) {
-        this.font = RGSS.asFont(obj);
-        return obj;
+    private BufferedImage copyImage() {
+        return new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null);
     }
 
     @JRubyMethod
@@ -113,7 +117,7 @@ public class RubyBitmap extends RubyObject {
 
     @JRubyMethod(name = "disposed?")
     public IRubyObject disposed_p() {
-        return isDisposed() ? getRuntime().getTrue() : getRuntime().getFalse();
+        return getRuntime().newBoolean(isDisposed());
     }
 
     private void checkDisposed() {
@@ -133,6 +137,7 @@ public class RubyBitmap extends RubyObject {
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        //graphics.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
         //graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
     }
 
@@ -141,6 +146,17 @@ public class RubyBitmap extends RubyObject {
             graphics.dispose();
             graphics = null;
         }
+    }
+
+    @JRubyMethod
+    public IRubyObject font() {
+        return font;
+    }
+
+    @JRubyMethod(name = "font=")
+    public IRubyObject set_font(IRubyObject obj) {
+        font.initialize_copy(obj);
+        return obj;
     }
 
     @JRubyMethod
@@ -221,7 +237,7 @@ public class RubyBitmap extends RubyObject {
     public void fill_rect(RubyRect rect, RubyColor color) {
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.Src);
-        g.setColor(color.toJavaColor());
+        g.setColor(color.getColor());
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
 
@@ -240,13 +256,13 @@ public class RubyBitmap extends RubyObject {
         g.setComposite(AlphaComposite.Src);
         if (vertical.isTrue()) {
             g.setPaint(new GradientPaint(
-                rect.x, rect.y, color1.toJavaColor(),
-                rect.x, rect.y + rect.height - 1, color2.toJavaColor()
+                rect.x, rect.y, color1.getColor(),
+                rect.x, rect.y + rect.height - 1, color2.getColor()
             ));
         } else {
             g.setPaint(new GradientPaint(
-                rect.x, rect.y, color1.toJavaColor(),
-                rect.x + rect.width - 1, rect.y, color2.toJavaColor()
+                rect.x, rect.y, color1.getColor(),
+                rect.x + rect.width - 1, rect.y, color2.getColor()
             ));
         }
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
@@ -292,7 +308,7 @@ public class RubyBitmap extends RubyObject {
 
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.Src.derive(opacity / 255.0f));
-        g.setPaint(new TexturePaint(src.image, srcRect.toJavaRectangle()));
+        g.setPaint(new TexturePaint(src.image, srcRect.getRectangle()));
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
 
@@ -313,12 +329,10 @@ public class RubyBitmap extends RubyObject {
         g.setComposite(AlphaComposite.SrcOver);
         g.setClip(rect.x, rect.y, rect.width, rect.height);
 
-        //TODO: font caching
-        //TODO: font shadow
-        Font javaFont = font.toJavaFont(g);
-
-        if (font.outline) {
-            GlyphVector gv = javaFont.createGlyphVector(g.getFontRenderContext(), str);
+        boolean outlineShapeRendering = false;
+        if (font.outline && outlineShapeRendering) {
+            Font awtFont = font.getFont(g);
+            GlyphVector gv = awtFont.createGlyphVector(g.getFontRenderContext(), str);
             Rectangle lb = gv.getLogicalBounds().getBounds();
 
             int x = rect.x + switch (align) {
@@ -326,19 +340,27 @@ public class RubyBitmap extends RubyObject {
                 case 2 -> Math.max(rect.width - lb.width, 0);
                 default -> 0;
             };
-            int y = rect.y + Math.max(rect.height - lb.height, 0) / 2;
+            int y = rect.y + Math.max(rect.height - lb.height, 0) / 2 - lb.y;
 
-            Shape shape = gv.getOutline(x, y - lb.y);
+            Shape shape = gv.getOutline(x, y);
 
-            g.setColor(font.outColor.toJavaColor());
-            g.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.draw(shape);
+            g.setStroke(font.getOutStroke());
 
-            g.setColor(font.color.toJavaColor());
+            if (font.shadow) {
+                g.translate(1, 1);
+                g.setColor(font.getShadowColor());
+                g.fill(shape);
+                g.draw(shape);
+                g.translate(-1, -1);
+            }
+
+            g.setColor(font.color.getColor());
             g.fill(shape);
-        } else {
 
-            g.setFont(javaFont);
+            g.setColor(font.getOutColor());
+            g.draw(shape);
+        } else {
+            g.setFont(font.getFont(g));
             FontMetrics fm = g.getFontMetrics();
             int width = fm.stringWidth(str);
             int height = fm.getHeight();
@@ -348,10 +370,23 @@ public class RubyBitmap extends RubyObject {
                 case 2 -> Math.max(rect.width - width, 0);
                 default -> 0;
             };
-            int y = rect.y + Math.max(rect.height - height, 0) / 2;
+            int y = rect.y + Math.max(rect.height - height, 0) / 2 + fm.getAscent();
 
-            g.setColor(font.color.toJavaColor());
-            g.drawString(str, x, y + fm.getAscent());
+            if (font.outline) {
+                g.setColor(font.getOutColor());
+                g.drawString(str, x - 1, y - 1);
+                g.drawString(str, x + 1, y - 1);
+                g.drawString(str, x - 1, y + 1);
+                g.drawString(str, x + 1, y + 1);
+            }
+
+            if (font.shadow) {
+                g.setColor(font.getShadowColor());
+                g.drawString(str, x + 1, y + 1);
+            }
+
+            g.setColor(font.color.getColor());
+            g.drawString(str, x, y);
         }
 
         g.setClip(null);
@@ -361,14 +396,11 @@ public class RubyBitmap extends RubyObject {
     public IRubyObject text_size(IRubyObject obj) {
         String str = obj.asString().asJavaString();
 
-        //TODO: font caching
-        graphics.setFont(font.toJavaFont(graphics));
-        FontMetrics fm = graphics.getFontMetrics();
+        Graphics2D g = getGraphics();
+        g.setFont(font.getFont(g));
+        FontMetrics fm = g.getFontMetrics();
 
-        // Because of rounding errors fm.getHeight() could be a pixel off from font.size.
-        // So just use font.size instead.
-
-        return RubyRect.newRect(getRuntime(), 0, 0, fm.stringWidth(str), (int) font.size);
+        return RubyRect.newRect(getRuntime(), 0, 0, fm.stringWidth(str), fm.getHeight());
     }
 
     @JRubyMethod
@@ -379,7 +411,6 @@ public class RubyBitmap extends RubyObject {
         for (int y = 0; y < image.getHeight(); y++) {
             for (int x = 0; x < image.getWidth(); x++) {
                 int argb = image.getRGB(x, y);
-                int a = (argb >> 24) & 0xFF;
                 int r = (argb >> 16) & 0xFF;
                 int g = (argb >> 8) & 0xFF;
                 int b = argb & 0xFF;
@@ -388,7 +419,7 @@ public class RubyBitmap extends RubyObject {
                 hsb[0] += dh;
 
                 int newRGB = Color.HSBtoRGB(hsb[0], hsb[1], hsb[2]);
-                image.setRGB(x, y, (a << 24) | (newRGB & 0xFFFFFF));
+                image.setRGB(x, y, (argb & 0xFF000000) | (newRGB & 0x00FFFFFF));
             }
         }
     }

@@ -4,6 +4,20 @@ img.save('test/rat.gif')
 
 b = Bitmap.new(544, 416)
 
+b.font.color = Color.new(255, 0, 0)
+b.font.out_color = Color.new(0, 0, 255)
+b.font.outline = true
+b.font.shadow = true
+b.font.name = 'DejaVu Sans'
+# for i in 6 .. 96
+#   b.font.size = i
+#   r = b.text_size("Hello!")
+#   if r.height != i
+#     p([i, r])
+#   end
+# end
+b.font.size = 96
+
 b.set_pixel(0, 0, Color.new(5, 105, 205, 200))
 p(b.get_pixel(0, 0))
 
@@ -26,7 +40,7 @@ b.fill_rect(rect, black)
 b.gradient_fill_rect(inner_rect, blue, yellow, true)
 b.stretch_blt(inner_rect2, img, img.rect)
 
-b.draw_text(inner_rect, "Hello", 1)
+b.draw_text(b.rect, "Hello, Rat!", 1)
 #b.hue_change(120)
 
 b.save('test/a.png')

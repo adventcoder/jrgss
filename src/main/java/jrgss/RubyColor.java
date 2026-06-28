@@ -28,38 +28,49 @@ public class RubyColor extends RubyObject {
     public double green;
     public double blue;
     public double alpha;
+    private Color color;
 
     public RubyColor(Ruby runtime, RubyClass metaClass) {
         super(runtime, metaClass);
     }
 
-    public RubyColor(Ruby runtime, RubyClass metaClass, double red, double green, double blue, double alpha) {
-        this(runtime, RGSS.colorClass);
-        this.red = red;
-        this.green = green;
-        this.blue = blue;
-        this.alpha = alpha;
+    public RubyColor(Ruby runtime) {
+        super(runtime, RGSS.colorClass);
     }
 
-    public static RubyColor newColor(Ruby runtime, double r, double g, double b, double a) {
-        return new RubyColor(runtime, RGSS.colorClass, r, g, b, a);
+    public static RubyColor newColor(Ruby runtime, double red, double green, double blue, double alpha) {
+        RubyColor color = new RubyColor(runtime);
+        color.red = red;
+        color.green = green;
+        color.blue = blue;
+        color.alpha = alpha;
+        return color;
     }
 
-    public static RubyColor newColor(Ruby runtime, double r, double g, double b) {
-        return newColor(runtime, r, g, b, 255);
+    public static RubyColor newColor(Ruby runtime, double red, double green, double blue) {
+        return newColor(runtime, red, green, blue, 255.0);
     }
 
     public static RubyColor newColor(Ruby runtime, int argb) {
-        //NOTE: caching?
         int a = (argb >> 24) & 0xFF;
         int r = (argb >> 16) & 0xFF;
         int g = (argb >> 8) & 0xFF;
         int b = argb & 0xFF;
-        return new RubyColor(runtime, RGSS.colorClass, r, g, b, a);
+        return newColor(runtime, r, g, b, a);
+    }
+
+    @JRubyMethod(meta = true, required = 3, optional = 1)
+    public static IRubyObject hsv(IRubyObject recv, IRubyObject... args) {
+        float h = (float) (RubyNumeric.num2dbl(args[0]) / 360.0);
+        float s = (float) (clamp(RubyNumeric.num2dbl(args[1])) / 255.0);
+        float b = (float) (clamp(RubyNumeric.num2dbl(args[2])) / 255.0);
+        RubyColor color = newColor(recv.getRuntime(), Color.HSBtoRGB(h, s, b));
+        if (args.length >= 4)
+            color.set_alpha(args[3]);
+        return color;
     }
 
     public int getARGB() {
-        //NOTE: this assumes values are in range or components will overflow
         int r = (int) (red + 0.5);
         int g = (int) (green + 0.5);
         int b = (int) (blue + 0.5);
@@ -67,20 +78,10 @@ public class RubyColor extends RubyObject {
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
-    public void setRed(double val) {
-        this.red = Math.min(Math.max(val, 0.0), 255.0);
-    }
-
-    public void setGreen(double val) {
-        this.green = Math.min(Math.max(val, 0.0), 255.0);
-    }
-
-    public void setBlue(double val) {
-        this.blue = Math.min(Math.max(val, 0.0), 255.0);
-    }
-
-    public void setAlpha(double val) {
-        this.alpha = Math.min(Math.max(val, 0.0), 255.0);
+    public Color getColor() {
+        if (color == null)
+            color = new Color(getARGB(), true);
+        return color;
     }
 
     @JRubyMethod
@@ -103,30 +104,6 @@ public class RubyColor extends RubyObject {
         return getRuntime().newFloat(alpha);
     }
 
-    @JRubyMethod(name = "red=")
-    public IRubyObject red_set(IRubyObject obj) {
-        setRed(RubyNumeric.num2dbl(obj));
-        return obj;
-    }
-
-    @JRubyMethod(name = "green=")
-    public IRubyObject green_set(IRubyObject obj) {
-        setGreen(RubyNumeric.num2dbl(obj));
-        return obj;
-    }
-
-    @JRubyMethod(name = "blue=")
-    public IRubyObject blue_set(IRubyObject obj) {
-        setBlue(RubyNumeric.num2dbl(obj));
-        return obj;
-    }
-
-    @JRubyMethod(name = "alpha=")
-    public IRubyObject alpha_set(IRubyObject obj) {
-        setAlpha(RubyNumeric.num2dbl(obj));
-        return obj;
-    }
-
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
     public void initialize(IRubyObject... args) {
         if (args.length == 0) {
@@ -134,13 +111,14 @@ public class RubyColor extends RubyObject {
             this.green = 0.0;
             this.blue = 0.0;
             this.alpha = 0.0;
+            this.color = null;
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 3, 4);
-            red_set(args[0]);
-            green_set(args[1]);
-            blue_set(args[2]);
+            set_red(args[0]);
+            set_green(args[1]);
+            set_blue(args[2]);
             if (args.length >= 4) {
-                alpha_set(args[3]);
+                set_alpha(args[3]);
             } else {
                 this.alpha = 255.0;
             }
@@ -159,37 +137,61 @@ public class RubyColor extends RubyObject {
             return set(args[0]);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 3, 4);
-            red_set(args[0]);
-            green_set(args[1]);
-            blue_set(args[2]);
+            set_red(args[0]);
+            set_green(args[1]);
+            set_blue(args[2]);
             if (args.length >= 4)
-                alpha_set(args[3]);
+                set_alpha(args[3]);
             return this;
         }
     }
 
-    private IRubyObject set(IRubyObject obj) {
+    public IRubyObject set(IRubyObject obj) {
         if (obj == this) return this;
         if (obj instanceof RubyColor color) {
             this.red = color.red;
             this.green = color.green;
             this.blue = color.blue;
             this.alpha = color.alpha;
+            this.color = color.color;
         } else {
             throw obj.getRuntime().newTypeError(obj, RGSS.colorClass);
         }
         return this;
     }
 
+    @JRubyMethod(name = "red=")
+    public IRubyObject set_red(IRubyObject obj) {
+        this.red = clamp(RubyNumeric.num2dbl(obj));
+        this.color = null;
+        return obj;
+    }
+
+    @JRubyMethod(name = "green=")
+    public IRubyObject set_green(IRubyObject obj) {
+        this.green = clamp(RubyNumeric.num2dbl(obj));
+        this.color = null;
+        return obj;
+    }
+
+    @JRubyMethod(name = "blue=")
+    public IRubyObject set_blue(IRubyObject obj) {
+        this.blue = clamp(RubyNumeric.num2dbl(obj));
+        this.color = null;
+        return obj;
+    }
+
+    @JRubyMethod(name = "alpha=")
+    public IRubyObject set_alpha(IRubyObject obj) {
+        this.alpha = clamp(RubyNumeric.num2dbl(obj));
+        this.color = null;
+        return obj;
+    }
+
     @JRubyMethod
     @Override
     public IRubyObject to_s() {
         return getRuntime().newString(String.format("(%f, %f, %f, %f)", red, green, blue, alpha));
-    }
-
-    public Color toJavaColor() {
-        //NOTE: this could be cached, but we'd need to invalidate on mutate
-        return new Color(getARGB(), true);
     }
 
     @JRubyMethod(name = "==", required = 1)
@@ -217,26 +219,17 @@ public class RubyColor extends RubyObject {
         ByteBuffer buf = ByteBuffer.wrap(data.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
         RubyColor color = (RubyColor) ((RubyClass) recv).allocate();
         try {
-            color.setRed(buf.getDouble());
-            color.setGreen(buf.getDouble());
-            color.setBlue(buf.getDouble());
-            color.setAlpha(buf.getDouble());
+            color.red = clamp(buf.getDouble());
+            color.green = clamp(buf.getDouble());
+            color.blue = clamp(buf.getDouble());
+            color.alpha = clamp(buf.getDouble());
         } catch (BufferUnderflowException e) {
             throw recv.getRuntime().newArgumentError("not enough data");
         }
         return color;
     }
 
-    @JRubyMethod(meta = true, required = 3, optional = 1)
-    public static IRubyObject hsv(IRubyObject recv, IRubyObject... args) {
-        double hue = RubyNumeric.num2dbl(args[0]);
-        double saturation = Math.min(Math.max(RubyNumeric.num2dbl(args[1]), 0.0), 255.0);
-        double brightness = Math.min(Math.max(RubyNumeric.num2dbl(args[2]), 0.0), 255.0);
-        double alpha = args.length >= 4 ? Math.min(Math.max(RubyNumeric.num2dbl(args[3]), 0.0), 255.0) : 255.0;
-
-        int rgb = Color.HSBtoRGB((float) (hue / 360.0), (float) (saturation / 255.0), (float) (brightness / 255.0));
-        int a = (int) (alpha + 0.5);
-
-        return RubyColor.newColor(recv.getRuntime(), (a << 24) | (rgb & 0xFFFFFF));
+    private static double clamp(double x) {
+        return Math.min(Math.max(x, 0.0), 255.0);
     }
 }

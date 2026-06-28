@@ -5,6 +5,7 @@ import java.awt.image.WritableRaster;
 import java.util.Arrays;
 
 //NOTE: blurs are done at raster level, and assume premultiplied alpha for correctness
+//TODO: we should grab pixels one scanline at a time rather than one pixel at a time, this would eliminate the need for a scratch buffer for blurX/blurY
 public class RasterOps {
     public static void blurX(Raster src, WritableRaster dst, int radius) {
         double weight = 1.0f / (2*radius + 1);
