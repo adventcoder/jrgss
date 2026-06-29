@@ -1,23 +1,20 @@
 package jrgss;
 
 import java.awt.Color;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyNumeric;
-import org.jruby.RubyObject;
-import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
-import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.ByteList;
 
-public class RubyColor extends RubyObject {
+import lombok.EqualsAndHashCode;
+
+@EqualsAndHashCode(callSuper = false)
+public class RubyColor extends RubyData {
     public static void createColorClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Color", runtime.getObject(), RubyColor::new);
         RGSS.colorClass = cls;
@@ -28,7 +25,7 @@ public class RubyColor extends RubyObject {
     public double green;
     public double blue;
     public double alpha;
-    private Color color;
+    private transient Color color;
 
     public RubyColor(Ruby runtime, RubyClass metaClass) {
         super(runtime, metaClass);
@@ -84,34 +81,15 @@ public class RubyColor extends RubyObject {
         return color;
     }
 
-    @JRubyMethod
-    public IRubyObject red() {
-        return getRuntime().newFloat(red);
-    }
-
-    @JRubyMethod
-    public IRubyObject green() {
-        return getRuntime().newFloat(green);
-    }
-
-    @JRubyMethod
-    public IRubyObject blue() {
-        return getRuntime().newFloat(blue);
-    }
-
-    @JRubyMethod
-    public IRubyObject alpha() {
-        return getRuntime().newFloat(alpha);
-    }
+    public @JRubyMethod IRubyObject red() { return getRuntime().newFloat(red); }
+    public @JRubyMethod IRubyObject green() { return getRuntime().newFloat(green); }
+    public @JRubyMethod IRubyObject blue() { return getRuntime().newFloat(blue); }
+    public @JRubyMethod IRubyObject alpha() { return getRuntime().newFloat(alpha); }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
     public void initialize(IRubyObject... args) {
         if (args.length == 0) {
-            this.red = 0.0;
-            this.green = 0.0;
-            this.blue = 0.0;
-            this.alpha = 0.0;
-            this.color = null;
+            clear();
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 3, 4);
             set_red(args[0]);
@@ -129,6 +107,14 @@ public class RubyColor extends RubyObject {
     @Override
     public IRubyObject initialize_copy(IRubyObject orig) {
         return set(orig);
+    }
+
+    public void clear() {
+        this.red = 0.0;
+        this.green = 0.0;
+        this.blue = 0.0;
+        this.alpha = 0.0;
+        this.color = null;
     }
 
     @JRubyMethod(rest = true)
@@ -188,45 +174,30 @@ public class RubyColor extends RubyObject {
         return obj;
     }
 
-    @JRubyMethod
     @Override
-    public IRubyObject to_s() {
-        return getRuntime().newString(String.format("(%f, %f, %f, %f)", red, green, blue, alpha));
+    public String toString() {
+        return String.format("(%f, %f, %f, %f)", red, green, blue, alpha);
     }
 
-    @JRubyMethod(name = "==", required = 1)
     @Override
-    public IRubyObject op_equal(ThreadContext context, IRubyObject obj) {
-        if (this == obj) return context.tru;
-        if (!(obj instanceof RubyColor color))
-            return context.fals;
-        return red == color.red && blue == color.blue && green == color.green && alpha == color.alpha ? context.tru : context.fals;
+    public int dataSize() {
+        return Double.BYTES*4;
     }
 
-    @JRubyMethod
-    public IRubyObject _dump(IRubyObject depth) {
-        ByteBuffer buf = ByteBuffer.allocate(Double.BYTES*4).order(ByteOrder.LITTLE_ENDIAN);
+    @Override
+    public void dump(ByteBuffer buf) {
         buf.putDouble(red);
         buf.putDouble(green);
         buf.putDouble(blue);
         buf.putDouble(alpha);
-        return getRuntime().newString(new ByteList(buf.array(), false));
     }
 
-    @JRubyMethod(meta = true)
-    public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
-        RubyString data = obj.convertToString();
-        ByteBuffer buf = ByteBuffer.wrap(data.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
-        RubyColor color = (RubyColor) ((RubyClass) recv).allocate();
-        try {
-            color.red = clamp(buf.getDouble());
-            color.green = clamp(buf.getDouble());
-            color.blue = clamp(buf.getDouble());
-            color.alpha = clamp(buf.getDouble());
-        } catch (BufferUnderflowException e) {
-            throw recv.getRuntime().newArgumentError("not enough data");
-        }
-        return color;
+    @Override
+    public void load(ByteBuffer buf) {
+        red = clamp(buf.getDouble());
+        green = clamp(buf.getDouble());
+        blue = clamp(buf.getDouble());
+        alpha = clamp(buf.getDouble());
     }
 
     private static double clamp(double x) {

@@ -12,7 +12,7 @@ public class RGSS {
 
     public static RubyClass rectClass;
     public static RubyClass colorClass;
-    public static RubyClass toneClass;
+    public static RubyClass tableClass;
 
     public static RubyClass bitmapClass;
     public static RubyClass fontClass;
@@ -23,6 +23,7 @@ public class RGSS {
 
         RubyRect.createRectClass(runtime);
         RubyColor.createColorClass(runtime);
+        RubyTable.createTableClass(runtime);
 
         RubyBitmap.createBitmapClass(runtime);
         RubyFont.createFontClass(runtime);

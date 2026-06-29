@@ -93,6 +93,15 @@ public class RubyFont extends RubyObject {
         return font;
     }
 
+    public @JRubyMethod IRubyObject name() { return name; }
+    public @JRubyMethod IRubyObject size() { return getRuntime().newFloat(size); }
+    public @JRubyMethod IRubyObject bold() { return getRuntime().newBoolean(bold); }
+    public @JRubyMethod IRubyObject italic() { return getRuntime().newBoolean(italic); }
+    public @JRubyMethod IRubyObject outline() { return getRuntime().newBoolean(outline); }
+    public @JRubyMethod IRubyObject shadow() { return getRuntime().newBoolean(shadow); }
+    public @JRubyMethod IRubyObject color() { return color; }
+    public @JRubyMethod IRubyObject out_color() { return outColor; }
+
     @JRubyMethod(visibility = Visibility.PRIVATE, optional = 2)
     public void initialize(IRubyObject... args) {
         set(defaultFont);
@@ -101,6 +110,7 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(visibility = Visibility.PRIVATE)
+    @Override
     public IRubyObject initialize_copy(IRubyObject obj) {
         if (obj == this) return this;
         if (obj instanceof RubyFont font) {
@@ -123,15 +133,6 @@ public class RubyFont extends RubyObject {
         this.font = font.getFont();
         this.pixelsPerPoint = font.pixelsPerPoint;
     }
-
-    public @JRubyMethod IRubyObject name() { return name; }
-    public @JRubyMethod IRubyObject size() { return getRuntime().newFloat(size); }
-    public @JRubyMethod IRubyObject bold() { return getRuntime().newBoolean(bold); }
-    public @JRubyMethod IRubyObject italic() { return getRuntime().newBoolean(italic); }
-    public @JRubyMethod IRubyObject outline() { return getRuntime().newBoolean(outline); }
-    public @JRubyMethod IRubyObject shadow() { return getRuntime().newBoolean(shadow); }
-    public @JRubyMethod IRubyObject color() { return color; }
-    public @JRubyMethod IRubyObject out_color() { return outColor; }
 
     @JRubyMethod(name = "name=")
     public IRubyObject set_name(IRubyObject obj) {

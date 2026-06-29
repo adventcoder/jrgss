@@ -1,23 +1,20 @@
 package jrgss;
 
 import java.awt.Rectangle;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyNumeric;
-import org.jruby.RubyObject;
-import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
-import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.ByteList;
 
-public class RubyRect extends RubyObject {
+import lombok.EqualsAndHashCode;
+
+@EqualsAndHashCode(callSuper = false)
+public class RubyRect extends RubyData {
     public static void createRectClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Rect", runtime.getObject(), RubyRect::new);
         RGSS.rectClass = cls;
@@ -72,25 +69,10 @@ public class RubyRect extends RubyObject {
         return new Rectangle(x, y, width, height);
     }
 
-    @JRubyMethod
-    public IRubyObject x() {
-        return RubyNumeric.int2fix(getRuntime(), x);
-    }
-
-    @JRubyMethod
-    public IRubyObject y() {
-        return RubyNumeric.int2fix(getRuntime(), y);
-    }
-
-    @JRubyMethod
-    public IRubyObject width() {
-        return RubyNumeric.int2fix(getRuntime(), width);
-    }
-
-    @JRubyMethod
-    public IRubyObject height() {
-        return RubyNumeric.int2fix(getRuntime(), height);
-    }
+    public @JRubyMethod IRubyObject x() { return  getRuntime().newFixnum(x); }
+    public @JRubyMethod IRubyObject y() { return  getRuntime().newFixnum(y); }
+    public @JRubyMethod IRubyObject width() { return  getRuntime().newFixnum(width); }
+    public @JRubyMethod IRubyObject height() { return  getRuntime().newFixnum(height); }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
     public void initialize(IRubyObject... args) {
@@ -171,43 +153,29 @@ public class RubyRect extends RubyObject {
         return obj;
     }
 
-    @JRubyMethod
     @Override
-    public IRubyObject to_s() {
-        return getRuntime().newString(String.format("(%d, %d, %d, %d)", x, y, width, height));
+    public String toString() {
+        return String.format("(%d, %d, %d, %d)", x, y, width, height);
     }
 
-    @JRubyMethod(name = "==", required = 1)
     @Override
-    public IRubyObject op_equal(ThreadContext context, IRubyObject obj) {
-        if (this == obj) return context.tru;
-        if (!(obj instanceof RubyRect rect)) return context.fals;
-        return x == rect.x && y == rect.y && width == rect.width && height == rect.height ? context.tru : context.fals;
+    public int dataSize() {
+        return Integer.BYTES*4;
     }
 
-    @JRubyMethod
-    public IRubyObject _dump(IRubyObject depth) {
-        ByteBuffer buf = ByteBuffer.allocate(Integer.BYTES*4).order(ByteOrder.LITTLE_ENDIAN);
+    @Override
+    public void dump(ByteBuffer buf) {
         buf.putInt(x);
         buf.putInt(y);
         buf.putInt(width);
         buf.putInt(height);
-        return getRuntime().newString(new ByteList(buf.array(), false));
     }
 
-    @JRubyMethod(meta = true)
-    public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
-        RubyString data = obj.convertToString();
-        ByteBuffer buf = ByteBuffer.wrap(data.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
-        RubyRect rect = (RubyRect) ((RubyClass) recv).allocate();
-        try {
-            rect.x = buf.getInt();
-            rect.y = buf.getInt();
-            rect.width = buf.getInt();
-            rect.height = buf.getInt();
-        } catch (BufferUnderflowException e) {
-            throw recv.getRuntime().newArgumentError("not enough data");
-        }
-        return rect;
+    @Override
+    public void load(ByteBuffer buf) {
+        x = buf.getInt();
+        y = buf.getInt();
+        width = buf.getInt();
+        height = buf.getInt();
     }
 }
