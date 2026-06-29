@@ -1,14 +1,11 @@
 package jrgss;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
-import java.awt.Stroke;
-import java.awt.image.BufferedImage;
+import java.awt.font.FontRenderContext;
+import java.awt.font.LineMetrics;
 
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
@@ -20,6 +17,8 @@ import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RubyFont extends RubyObject {
+    private static FontRenderContext frc;
+
     //NOTE: this should be stored per runtime
     //TODO: maybe store on RGSS where we have other per runtime properties
     private static RubyFont defaultFont;
@@ -61,10 +60,12 @@ public class RubyFont extends RubyObject {
     public static @JRubyMethod(meta = true, name = "default_color=") IRubyObject set_default_color(IRubyObject recv, IRubyObject obj) { return defaultFont.set_color(obj); }
     public static @JRubyMethod(meta = true, name = "default_out_color=") IRubyObject set_default_out_color(IRubyObject recv, IRubyObject obj) { return defaultFont.set_out_color(obj); }
 
-    protected IRubyObject name;
-    protected double size;
-    protected boolean bold, italic, outline, shadow;
-    protected RubyColor color, outColor;
+    public IRubyObject name;
+    public double size;
+    public boolean bold, italic, outline, shadow;
+    public RubyColor color, outColor;
+    private Font font;
+    private float pixelsPerPoint;
 
     public RubyFont(Ruby runtime, RubyClass metaClass, boolean useObjectSpace) {
         super(runtime, metaClass, useObjectSpace);
@@ -110,15 +111,6 @@ public class RubyFont extends RubyObject {
         return this;
     }
 
-    public @JRubyMethod IRubyObject name() { return name; }
-    public @JRubyMethod IRubyObject size() { return getRuntime().newFloat(size); }
-    public @JRubyMethod IRubyObject bold() { return getRuntime().newBoolean(bold); }
-    public @JRubyMethod IRubyObject italic() { return getRuntime().newBoolean(italic); }
-    public @JRubyMethod IRubyObject outline() { return getRuntime().newBoolean(outline); }
-    public @JRubyMethod IRubyObject shadow() { return getRuntime().newBoolean(shadow); }
-    public @JRubyMethod IRubyObject color() { return color; }
-    public @JRubyMethod IRubyObject out_color() { return outColor; }
-
     private void set(RubyFont font) {
         this.name = font.name;
         this.size = font.size;
@@ -128,29 +120,44 @@ public class RubyFont extends RubyObject {
         this.shadow = font.shadow;
         this.color.set(font.color);
         this.outColor.set(font.outColor);
+        this.font = font.getFont();
+        this.pixelsPerPoint = font.pixelsPerPoint;
     }
+
+    public @JRubyMethod IRubyObject name() { return name; }
+    public @JRubyMethod IRubyObject size() { return getRuntime().newFloat(size); }
+    public @JRubyMethod IRubyObject bold() { return getRuntime().newBoolean(bold); }
+    public @JRubyMethod IRubyObject italic() { return getRuntime().newBoolean(italic); }
+    public @JRubyMethod IRubyObject outline() { return getRuntime().newBoolean(outline); }
+    public @JRubyMethod IRubyObject shadow() { return getRuntime().newBoolean(shadow); }
+    public @JRubyMethod IRubyObject color() { return color; }
+    public @JRubyMethod IRubyObject out_color() { return outColor; }
 
     @JRubyMethod(name = "name=")
     public IRubyObject set_name(IRubyObject obj) {
         name = obj;
+        font = null;
         return obj;
     }
 
     @JRubyMethod(name = "size=")
     public IRubyObject set_size(IRubyObject obj) {
         size = RGSS.checkRange(obj, "size", 6, 96);
+        refreshSize();
         return obj;
     }
 
     @JRubyMethod(name = "bold=")
     public IRubyObject set_bold(IRubyObject obj) {
         this.bold = obj.isTrue();
+        refreshStyle();
         return obj;
     }
 
     @JRubyMethod(name = "italic=")
     public IRubyObject set_italic(IRubyObject obj) {
         this.italic = obj.isTrue();
+        refreshStyle();
         return obj;
     }
 
@@ -195,8 +202,8 @@ public class RubyFont extends RubyObject {
         return recv.getRuntime().newBoolean(font.getFamily().equalsIgnoreCase(name));
     }
 
-    public Stroke getOutStroke() {
-        return new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
+    public Color getColor() {
+        return color.getColor();
     }
 
     public Color getOutColor() {
@@ -212,19 +219,21 @@ public class RubyFont extends RubyObject {
         return new Color(0, 0, 0, a);
     }
 
-    public Font getFont(Graphics2D g) {
-        //TODO: this needs to be cached
-        //      size and bold/italic can be rederived on the fly as long as we also store the pointsPerPixel.
-        Font base = getFont(1);
+    public Font getFont() {
+        //TODO: the same fonts are usually used in many places, so we should probably have a global cache instead of per font
+        //TODO: we could also pass graphics here and not have a global FontRenderContext, but would have to cache against the frc (which is hashable)
+        if (font == null) {
+            font = lookupFont(1);
 
-        double pixelsPerPoint = base.getLineMetrics("", g.getFontRenderContext()).getHeight();
-        double pointsPerPixel = 1 / pixelsPerPoint;
-        // subtract 0.5 to cancel with the rounding performed by FontMetrics
+            LineMetrics lm = font.getLineMetrics("", getFontRenderContext());
+            pixelsPerPoint = lm.getHeight();
 
-        return base.deriveFont((float) (size * pointsPerPixel) - 0.5f);
+            font = font.deriveFont(getFontSize());
+        }
+        return font;
     }
 
-    private Font getFont(int sizePts) {
+    private Font lookupFont(int sizePts) {
         int style = getFontStyle();
 
         if (name instanceof RubyArray) {
@@ -246,6 +255,24 @@ public class RubyFont extends RubyObject {
         return new Font(Font.SANS_SERIF, style, sizePts);
     }
 
+    private void refreshSize() {
+        if (font == null) return;
+        float sizePts = getFontSize();
+        if (font.getSize2D() != sizePts)
+            font = font.deriveFont(sizePts);
+    }
+
+    private void refreshStyle() {
+        if (font == null) return;
+        int style = getFontStyle();
+        if (font.getStyle() != style)
+            font = font.deriveFont(style);
+    }
+
+    private float getFontSize() {
+        return (float) (size / pixelsPerPoint);
+    }
+
     private int getFontStyle() {
         int style = 0;
         if (bold) style |= Font.BOLD;
@@ -253,25 +280,12 @@ public class RubyFont extends RubyObject {
         return style;
     }
 
-    public static void main(String[] args) {
-        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
-        BufferedImage image = gc.createCompatibleImage(1, 1);
-        Graphics2D g = image.createGraphics();
-
-        Font base = new Font("DejaVu SANS Bold", 0, 1);
-        System.out.println(base.getName());
-        System.out.println(base.getFamily());
-        System.out.println(base.getFontName());
-
-        System.out.println(base.getFamily());
-        float pixelsPerPoint = base.getLineMetrics("", g.getFontRenderContext()).getHeight();
-        float pointsPerPixel = 1 / pixelsPerPoint;
-
-        for (int sizePx = 6; sizePx <= 96; sizePx++) {
-            g.setFont(base.deriveFont(sizePx * pointsPerPixel - 0.5f));
-            FontMetrics fm = g.getFontMetrics();
-            if (fm.getHeight() != sizePx)
-                System.out.println("Expecting: " + sizePx + "px, got: " + fm.getHeight() + "px");
+    private static FontRenderContext getFontRenderContext() {
+        if (frc == null) {
+            GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+            // the render hints should match what we have in RubyBitmap
+            frc = new FontRenderContext(gc.getDefaultTransform(), true, false);
         }
+        return frc;
     }
 }

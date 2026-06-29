@@ -2,20 +2,17 @@ package jrgss;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
-import java.awt.Font;
-import java.awt.FontMetrics;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsEnvironment;
-import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.TexturePaint;
 import java.awt.Transparency;
 import java.awt.font.GlyphVector;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
 import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.IOException;
@@ -137,8 +134,7 @@ public class RubyBitmap extends RubyObject {
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        //graphics.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-        //graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        graphics.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_OFF);
     }
 
     public void flushGraphics() {
@@ -328,49 +324,43 @@ public class RubyBitmap extends RubyObject {
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.SrcOver);
         g.setClip(rect.x, rect.y, rect.width, rect.height);
+        g.setFont(font.getFont());
 
         boolean outlineShapeRendering = false;
         if (font.outline && outlineShapeRendering) {
-            Font awtFont = font.getFont(g);
-            GlyphVector gv = awtFont.createGlyphVector(g.getFontRenderContext(), str);
-            Rectangle lb = gv.getLogicalBounds().getBounds();
+            GlyphVector gv = g.getFont().createGlyphVector(g.getFontRenderContext(), str);
+            Rectangle2D.Float bounds = (Rectangle2D.Float) gv.getLogicalBounds();
 
-            int x = rect.x + switch (align) {
-                case 1 -> Math.max(rect.width - lb.width, 0) / 2;
-                case 2 -> Math.max(rect.width - lb.width, 0);
+            float x = rect.x + switch (align) {
+                case 1 -> Math.max(rect.width - bounds.width, 0) / 2;
+                case 2 -> Math.max(rect.width - bounds.width, 0);
                 default -> 0;
             };
-            int y = rect.y + Math.max(rect.height - lb.height, 0) / 2 - lb.y;
+            float y = rect.y + Math.max(rect.height - bounds.height, 0) / 2 - bounds.y;
+
+            if (font.shadow) {
+                Shape shadowShape = gv.getOutline(x + 1, y + 1);
+                g.setColor(font.getShadowColor());
+                g.fill(shadowShape);
+                g.draw(shadowShape);
+            }
 
             Shape shape = gv.getOutline(x, y);
 
-            g.setStroke(font.getOutStroke());
-
-            if (font.shadow) {
-                g.translate(1, 1);
-                g.setColor(font.getShadowColor());
-                g.fill(shape);
-                g.draw(shape);
-                g.translate(-1, -1);
-            }
-
-            g.setColor(font.color.getColor());
+            g.setColor(font.getColor());
             g.fill(shape);
 
             g.setColor(font.getOutColor());
             g.draw(shape);
         } else {
-            g.setFont(font.getFont(g));
-            FontMetrics fm = g.getFontMetrics();
-            int width = fm.stringWidth(str);
-            int height = fm.getHeight();
+            Rectangle2D.Float bounds = (Rectangle2D.Float) g.getFont().getStringBounds(str, g.getFontRenderContext());
 
-            int x = rect.x + switch (align) {
-                case 1 -> Math.max(rect.width - width, 0) / 2;
-                case 2 -> Math.max(rect.width - width, 0);
+            float x = rect.x + switch (align) {
+                case 1 -> Math.max(rect.width - bounds.width, 0) / 2;
+                case 2 -> Math.max(rect.width - bounds.width, 0);
                 default -> 0;
             };
-            int y = rect.y + Math.max(rect.height - height, 0) / 2 + fm.getAscent();
+            float y = rect.y + Math.max(rect.height - bounds.height, 0) / 2 - bounds.y;
 
             if (font.outline) {
                 g.setColor(font.getOutColor());
@@ -385,7 +375,7 @@ public class RubyBitmap extends RubyObject {
                 g.drawString(str, x + 1, y + 1);
             }
 
-            g.setColor(font.color.getColor());
+            g.setColor(font.getColor());
             g.drawString(str, x, y);
         }
 
@@ -397,10 +387,11 @@ public class RubyBitmap extends RubyObject {
         String str = obj.asString().asJavaString();
 
         Graphics2D g = getGraphics();
-        g.setFont(font.getFont(g));
-        FontMetrics fm = g.getFontMetrics();
+        Rectangle2D bounds = font.getFont().getStringBounds(str, g.getFontRenderContext());
+        int width = (int) Math.ceil(bounds.getWidth());
+        int height = (int) Math.ceil(bounds.getHeight());
 
-        return RubyRect.newRect(getRuntime(), 0, 0, fm.stringWidth(str), fm.getHeight());
+        return RubyRect.newRect(getRuntime(), 0, 0, width, height);
     }
 
     @JRubyMethod
