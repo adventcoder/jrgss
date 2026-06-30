@@ -2,6 +2,7 @@ package jrgss;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -17,6 +18,9 @@ public class RGSS {
     public static RubyClass bitmapClass;
     public static RubyClass fontClass;
 
+    public static RubyModule graphicsModule;
+    public static RubyModule inputModule;
+
     public static void bootstrap(Ruby runtime) {
         resetClass = defineSubclass("RGSSReset", runtime.getException());
         errorClass = defineSubclass("RGSSError", runtime.getStandardError());
@@ -27,6 +31,9 @@ public class RGSS {
 
         RubyBitmap.createBitmapClass(runtime);
         RubyFont.createFontClass(runtime);
+
+        RubyGraphics.createGraphicsModule(runtime);
+        RubyInput.createInputModule(runtime);
     }
 
     private static RubyClass defineSubclass(String name, RubyClass superClass) {
