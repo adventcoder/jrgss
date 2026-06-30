@@ -8,7 +8,7 @@ b.font.color = Color.new(255, 0, 0)
 b.font.out_color = Color.new(0, 0, 255)
 b.font.outline = true
 b.font.shadow = true
-b.font.name = 'DejaVu Sans'
+b.font.name = 'VL Gothic'
 # for i in 6 .. 96
 #   b.font.size = i
 #   r = b.text_size("Hello!")

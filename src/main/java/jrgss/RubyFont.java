@@ -241,15 +241,15 @@ public class RubyFont extends RubyObject {
             RubyArray<?> nameAsArray = (RubyArray<?>) name;
             for (int i = 0; i < nameAsArray.getLength(); i++) {
                 IRubyObject elt = nameAsArray.eltOk(i);
-                String faceName = elt.asString().asJavaString();
-                Font font = new Font(faceName, Font.PLAIN, sizePts);
-                if (font.getFontName().equalsIgnoreCase(faceName))
+                String familyOrFaceName = elt.asString().asJavaString();
+                Font font = new Font(familyOrFaceName, style, sizePts);
+                if (font.getFamily().equalsIgnoreCase(familyOrFaceName) || font.getFontName().equalsIgnoreCase(familyOrFaceName))
                     return font;
             }
         } else {
-            String faceName = name.asString().asJavaString();
-            Font font = new Font(faceName, style, sizePts);
-            if (font.getFontName().equalsIgnoreCase(faceName))
+            String familyOrFaceName = name.asString().asJavaString();
+            Font font = new Font(familyOrFaceName, style, sizePts);
+            if (font.getFamily().equalsIgnoreCase(familyOrFaceName) || font.getFontName().equalsIgnoreCase(familyOrFaceName))
                 return font;
         }
 

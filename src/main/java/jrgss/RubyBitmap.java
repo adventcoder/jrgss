@@ -326,6 +326,8 @@ public class RubyBitmap extends RubyObject {
         g.setClip(rect.x, rect.y, rect.width, rect.height);
         g.setFont(font.getFont());
 
+        //TODO: scale to fit width
+
         boolean outlineShapeRendering = false;
         if (font.outline && outlineShapeRendering) {
             GlyphVector gv = g.getFont().createGlyphVector(g.getFontRenderContext(), str);
@@ -388,8 +390,9 @@ public class RubyBitmap extends RubyObject {
 
         Graphics2D g = getGraphics();
         Rectangle2D bounds = font.getFont().getStringBounds(str, g.getFontRenderContext());
-        int width = (int) Math.ceil(bounds.getWidth());
-        int height = (int) Math.ceil(bounds.getHeight());
+        // hack since values should be very close to integers but otherwise we want to round up
+        int width = (int) (bounds.getWidth() + 0.99);
+        int height = (int) (bounds.getHeight() + 0.99);
 
         return RubyRect.newRect(getRuntime(), 0, 0, width, height);
     }
