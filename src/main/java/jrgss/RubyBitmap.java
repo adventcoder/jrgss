@@ -52,6 +52,11 @@ public class RubyBitmap extends RubyObject {
         font = new RubyFont(runtime);
     }
 
+    public static RubyBitmap newBitmap(Ruby runtime, int width, int height) {
+        //TODO
+        return new RubyBitmap(runtime, RGSS.bitmapClass);
+    }
+
     @JRubyMethod
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
         GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();

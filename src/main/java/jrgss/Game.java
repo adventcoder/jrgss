@@ -6,7 +6,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontFormatException;
 import java.awt.Frame;
-import java.awt.Graphics;
 import java.awt.GraphicsEnvironment;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -15,89 +14,85 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jruby.embed.ScriptingContainer;
-import org.jruby.exceptions.RaiseException;
-import org.jruby.runtime.backtrace.RubyStackTraceElement;
 
 public class Game {
+    public static Frame frame;
+    public static Canvas screen;
 
     public static void main(String[] args) throws Exception {
-        AtomicBoolean running = new AtomicBoolean(true);
-        AtomicBoolean active = new AtomicBoolean(false);
+        ScriptingContainer container = new ScriptingContainer();
+        initEnv(container, args);
+        RGSS.bootstrap(container.getProvider().getRuntime());
 
-        Canvas canvas = new Canvas();
-        canvas.setBackground(Color.BLACK);
-        canvas.setIgnoreRepaint(true);
-        canvas.setPreferredSize(new Dimension(544, 416));
+        createScreen();
+        createFrame();
+        setupFonts();
 
-        Frame frame = new Frame();
+        RubyGraphics.reset();
+        RubyInput.reset();
+        runScripts(container);
+    }
+
+    public static void initEnv(ScriptingContainer container, String[] args) {
+        boolean test = false;
+        boolean btest = false;
+        for (String arg : args) {
+            if (arg.equalsIgnoreCase("test")) {
+                test = true;
+            } else if (arg.equalsIgnoreCase("best")) {
+                test = true;
+                btest = true;
+            }
+        }
+        container.put("$TEST", test);
+        container.put("$BTEST", btest);
+    }
+
+    private static void createScreen() {
+        screen = new Canvas();
+        screen.setBackground(Color.BLACK);
+        screen.setIgnoreRepaint(true);
+        screen.setPreferredSize(new Dimension(544, 416));
+    }
+
+    private static void createFrame() {
+        frame = new Frame();
         frame.setTitle("Untitled");
-        frame.add(canvas);
-        frame.pack();
-        frame.setLocationByPlatform(true);
         frame.setResizable(false);
+        frame.add(screen);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
         frame.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                running.set(false);
-            }
-        });
-        frame.addWindowFocusListener(new WindowAdapter() {
-            @Override
-            public void windowGainedFocus(WindowEvent e) {
-                System.out.println("Window Gained Focus");
-                active.set(true);
-            }
-
-            @Override
-            public void windowLostFocus(WindowEvent e) {
-                System.out.println("Window Lost Focus");
-                active.set(false);
+                System.exit(0);
             }
         });
         frame.setVisible(true);
+    }
 
-        canvas.createBufferStrategy(2);
-        BufferStrategy bs = canvas.getBufferStrategy();
+    public static void repackFrame() {
+        int centerX = frame.getX() + frame.getWidth() / 2;
+        int centerY = frame.getY() + frame.getHeight() / 2;
+        frame.pack();
+        frame.setLocation(centerX - frame.getWidth() / 2, centerY - frame.getHeight() / 2);
+    }
 
-        int frameCount = 0;
-        while (running.get()) {
-            if (active.get()) {
-                Graphics g = bs.getDrawGraphics();
-                try {
-                    render(g, frameCount);
-                } finally {
-                    g.dispose();
-                }
-                bs.show();
-                frameCount++;
-            }
-            Thread.sleep(16);
+    public static BufferStrategy getBufferStrategy() {
+        BufferStrategy bs = screen.getBufferStrategy();
+        if (bs == null) {
+            screen.createBufferStrategy(2);
+            bs = screen.getBufferStrategy();
         }
-
-        System.exit(0);
+        return bs;
     }
 
-    private static void render(Graphics g, int frameCount) {
-        g.setColor(Color.getHSBColor(frameCount % 360 / 360.0f, 1.0f, 1.0f));
-        g.fillOval(16, 16, 544 - 32, 416 - 32);
-    }
-
-    public static void runScripts() throws IOException {
-
-        // try (InputStream in = new FileInputStream("Scripts/test.rb")) {
-        //     container.runScriptlet(in, "{0000}");
-        // } catch (RaiseException e) {
-        //     RubyStackTraceElement elm = e.getException().getBacktraceElements()[0];
-        //     int scriptIndex = Integer.parseInt(elm.getFileName().substring(1, elm.getFileName().length() - 1));
-        //     String scriptName = List.of("Test Script").get(scriptIndex);
-        //     System.err.println(String.format("Script '%s' line %d: %s occurred.", scriptName, elm.getLineNumber(), e.getException().getClass().getName()));
-        //     System.err.println();
-        //     System.err.println(e.getMessage());
-        // }
+    public static void runScripts(ScriptingContainer container) throws IOException {
+        try (InputStream in = new FileInputStream("Scripts/{0000} Main.rb")) {
+            container.runScriptlet(in, "{0000}");
+        }
     }
 
     public static void setupFonts() {

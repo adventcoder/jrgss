@@ -12,6 +12,10 @@ public class RubyInput {
         mod.defineAnnotatedMethods(RubyInput.class);
     }
 
+    public static void reset() {
+
+    }
+
     @JRubyMethod(meta = true)
     public static void update(IRubyObject recv) {
 
