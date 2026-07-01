@@ -12,6 +12,11 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RubyInput {
+    public static final int KEY_DOWN = 2;
+    public static final int KEY_LEFT = 4;
+    public static final int KEY_RIGHT = 6;
+    public static final int KEY_UP = 8;
+
     public static void createInputModule(Ruby runtime) {
         RubyModule mod = runtime.defineModule("Input");
         RGSS.inputModule = mod;
@@ -32,7 +37,7 @@ public class RubyInput {
     private static Set<Integer> wasPressed = new HashSet<>();
     private static Set<Integer> pressed = new HashSet<>();
 
-    public static void reset() {
+    public static void clear() {
         wasPressed.clear();
         pressed.clear();
     }
@@ -40,9 +45,7 @@ public class RubyInput {
     @JRubyMethod(meta = true)
     public static void update(IRubyObject recv) {
         wasPressed = pressed;
-        // could swap here to avoid copy
         pressed = new HashSet<>();
-        pressed.addAll(Game.pressed);
     }
 
     @JRubyMethod(meta = true, name = "press?")

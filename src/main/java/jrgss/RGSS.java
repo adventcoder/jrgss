@@ -73,6 +73,10 @@ public class RGSS {
 
     // Errors
 
+    public static RaiseException newReset(Ruby runtime) {
+        return runtime.newRaiseException(resetClass, "");
+    }
+
     public static RaiseException newError(Ruby runtime, String message) {
         return runtime.newRaiseException(errorClass, message);
     }
