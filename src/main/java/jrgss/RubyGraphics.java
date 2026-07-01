@@ -24,7 +24,7 @@ public class RubyGraphics {
     private static long frameStartTime;
 
     public static void reset() {
-        frameRate = 60;
+        frameRate = 30;
         frameCount = 0;
         frameStartTime = System.nanoTime();
     }
@@ -79,8 +79,13 @@ public class RubyGraphics {
 
         long desiredFrameTime = 1000_000_000L / frameRate;
         long timeRemaining = desiredFrameTime - frameTime;
-        if (timeRemaining > 0)
+        if (timeRemaining > 0) {
+            Game.frame.setTitle(String.format("Untitled - %d FPS", frameRate));
             Thread.sleep(timeRemaining / 1000_000L, (int) (timeRemaining % 1000_000L));
+        } else {
+            int fps = (int) (1000_000_000L / frameTime);
+            Game.frame.setTitle(String.format("Untitled - %d FPS", fps));
+        }
     }
 
     @JRubyMethod(meta = true)

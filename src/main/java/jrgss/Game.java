@@ -7,6 +7,8 @@ import java.awt.Font;
 import java.awt.FontFormatException;
 import java.awt.Frame;
 import java.awt.GraphicsEnvironment;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferStrategy;
@@ -14,17 +16,20 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.jruby.embed.ScriptingContainer;
 
 public class Game {
     public static Frame frame;
     public static Canvas screen;
+    public static Set<Integer> pressed = ConcurrentHashMap.newKeySet();
 
     public static void main(String[] args) throws Exception {
         ScriptingContainer container = new ScriptingContainer();
-        initEnv(container, args);
         RGSS.bootstrap(container.getProvider().getRuntime());
+        initEnv(container, args);
 
         createScreen();
         createFrame();
@@ -68,6 +73,25 @@ public class Game {
             @Override
             public void windowClosing(WindowEvent e) {
                 System.exit(0);
+            }
+        });
+        frame.addKeyListener(new KeyAdapter() {
+            public void keyPressed(KeyEvent e) {
+                pressed.add(e.getKeyCode());
+            }
+
+            public void keyReleased(KeyEvent e) {
+                pressed.remove(e.getKeyCode());
+            }
+        });
+        frame.addWindowFocusListener(new WindowAdapter() {
+            @Override
+            public void windowGainedFocus(WindowEvent e) {
+            }
+
+            @Override
+            public void windowLostFocus(WindowEvent e) {
+                pressed.clear();
             }
         });
         frame.setVisible(true);
