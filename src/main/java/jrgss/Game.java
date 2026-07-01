@@ -3,10 +3,12 @@ package jrgss;
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.FontFormatException;
 import java.awt.Frame;
 import java.awt.GraphicsEnvironment;
+import java.awt.TrayIcon.MessageType;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
@@ -16,17 +18,32 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
+import javax.swing.JOptionPane;
+
+import org.jruby.RubyException;
+import org.jruby.embed.EvalFailedException;
 import org.jruby.embed.ScriptingContainer;
+import org.jruby.exceptions.RaiseException;
+import org.jruby.runtime.backtrace.RubyStackTraceElement;
 
 public class Game {
     public static Frame frame;
     public static Canvas screen;
-    public static Set<Integer> pressed = ConcurrentHashMap.newKeySet();
 
-    public static void main(String[] args) throws Exception {
+    private static boolean fpsShowing = false;
+    private static int fps;
+
+    public static AtomicBoolean resetting = new AtomicBoolean(false);
+
+    private static ReentrantLock lock = new ReentrantLock();
+    private static Condition activated = lock.newCondition();
+    private static boolean active = false;
+
+    public static void main(String[] args) throws Throwable {
         ScriptingContainer container = new ScriptingContainer();
         RGSS.bootstrap(container.getProvider().getRuntime());
         initEnv(container, args);
@@ -58,6 +75,7 @@ public class Game {
     private static void createScreen() {
         screen = new Canvas();
         screen.setBackground(Color.BLACK);
+        screen.setFocusable(false);
         screen.setIgnoreRepaint(true);
         screen.setPreferredSize(new Dimension(544, 416));
     }
@@ -74,24 +92,36 @@ public class Game {
             public void windowClosing(WindowEvent e) {
                 System.exit(0);
             }
+
+            @Override
+            public void windowActivated(WindowEvent e) {
+                lock.lock();
+                active = true;
+                activated.signalAll();
+                lock.unlock();
+            }
+
+            @Override
+            public void windowDeactivated(WindowEvent e) {
+                lock.lock();
+                active = false;
+                lock.unlock();
+            }
         });
         frame.addKeyListener(new KeyAdapter() {
+            @Override
             public void keyPressed(KeyEvent e) {
-                pressed.add(e.getKeyCode());
-            }
-
-            public void keyReleased(KeyEvent e) {
-                pressed.remove(e.getKeyCode());
-            }
-        });
-        frame.addWindowFocusListener(new WindowAdapter() {
-            @Override
-            public void windowGainedFocus(WindowEvent e) {
-            }
-
-            @Override
-            public void windowLostFocus(WindowEvent e) {
-                pressed.clear();
+                switch (e.getKeyCode()) {
+                    case KeyEvent.VK_F1 -> {
+                        JOptionPane.showMessageDialog(frame, "hi");
+                    }
+                    case KeyEvent.VK_F2 -> {
+                        toggleFps();
+                    }
+                    case KeyEvent.VK_F12 -> {
+                        resetting.set(true);
+                    }
+                }
             }
         });
         frame.setVisible(true);
@@ -113,9 +143,59 @@ public class Game {
         return bs;
     }
 
-    public static void runScripts(ScriptingContainer container) throws IOException {
-        try (InputStream in = new FileInputStream("Scripts/{0000} Main.rb")) {
-            container.runScriptlet(in, "{0000}");
+    public static void waitIfNotActive() throws InterruptedException {
+        if (!active) {
+            lock.lock();
+            if (!active)
+                activated.await();
+            lock.unlock();
+        }
+    }
+
+    private static void toggleFps() {
+        if (fpsShowing) {
+            frame.setTitle(frame.getTitle().substring(0, frame.getTitle().lastIndexOf(" -")));
+            fpsShowing = false;
+        } else {
+            frame.setTitle(frame.getTitle() + " - " + fps + " FPS");
+            fpsShowing = true;
+        }
+    }
+
+    public static void updateFps(int fps) {
+        EventQueue.invokeLater(() -> {
+            Game.fps = fps;
+            if (fpsShowing)
+                frame.setTitle(frame.getTitle().substring(0, frame.getTitle().lastIndexOf(" -")) + " - " + fps + " FPS");
+        });
+    }
+
+    public static void runScripts(ScriptingContainer container) throws Throwable {
+        int index = 0;
+        String file = String.format("{%04d}", index);
+        String title = "Main";
+        try (InputStream in = new FileInputStream("Scripts/" + file + " " + title + ".rb")) {
+            container.runScriptlet(in, file);
+        } catch (EvalFailedException e) {
+            if (e.getCause() instanceof RaiseException re) {
+                RubyException exc = re.getException();
+
+                int line = 0;
+                RubyStackTraceElement[] backtrace = exc.getBacktraceElements();
+                for (RubyStackTraceElement el : backtrace) {
+                    if (el.getFileName().equals(file)) {
+                        line = el.getLineNumber();
+                        break;
+                    }
+                }
+
+                String message = String.format("Script '%s' line %d: %s occurred.", title, line, exc.getMetaClass().getRealClass().getName());
+                message += "\n\n" + exc.getMessageAsJavaString();
+
+                JOptionPane.showMessageDialog(frame, message, frame.getTitle(), JOptionPane.WARNING_MESSAGE);
+                System.exit((index << 16) | line);
+            }
+            throw e.getCause();
         }
     }
 

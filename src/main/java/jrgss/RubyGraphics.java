@@ -3,7 +3,7 @@ package jrgss;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
-import java.awt.Toolkit;
+import java.awt.KeyboardFocusManager;
 import java.awt.image.BufferStrategy;
 
 import org.jruby.Ruby;
@@ -59,8 +59,10 @@ public class RubyGraphics {
         int width = RubyNumeric.num2int(arg0);
         int height = RubyNumeric.num2int(arg1);
         Game.screen.setPreferredSize(new Dimension(width, height));
+        //TODO: this is ignored sometimes...
         Game.repackFrame();
         Game.screen.getBufferStrategy().dispose();
+        //TODO: possible to copy from the back buffer instead of rerendering the frame?
         renderToScreen();
     }
 
@@ -72,7 +74,12 @@ public class RubyGraphics {
     @JRubyMethod(meta = true)
     public static void update(IRubyObject recv) throws InterruptedException {
         renderToScreen();
+        endFrame();
+        Game.waitIfNotActive();
+        checkReset(recv.getRuntime());
+    }
 
+    private static void endFrame() throws InterruptedException {
         long frameTime = System.nanoTime() - frameStartTime;
         frameStartTime += frameTime;
         frameCount++;
@@ -80,12 +87,17 @@ public class RubyGraphics {
         long desiredFrameTime = 1000_000_000L / frameRate;
         long timeRemaining = desiredFrameTime - frameTime;
         if (timeRemaining > 0) {
-            Game.frame.setTitle(String.format("Untitled - %d FPS", frameRate));
+            Game.updateFps(frameRate);
             Thread.sleep(timeRemaining / 1000_000L, (int) (timeRemaining % 1000_000L));
         } else {
             int fps = (int) (1000_000_000L / frameTime);
-            Game.frame.setTitle(String.format("Untitled - %d FPS", fps));
+            Game.updateFps(fps);
         }
+    }
+
+    private static void checkReset(Ruby runtime) {
+        if (Game.resetting.compareAndSet(true, false))
+            throw RGSS.newReset(runtime);
     }
 
     @JRubyMethod(meta = true)
@@ -107,11 +119,10 @@ public class RubyGraphics {
             g.dispose();
         }
         bs.show();
-        Toolkit.getDefaultToolkit().sync();
     }
 
     private static void render(Graphics g) {
-        g.setColor(Color.ORANGE);
+        g.setColor(Color.getHSBColor(frameCount % 360 / 360.0f, 1.0f, 1.0f));
         g.fillOval(0, 0, Game.screen.getWidth(), Game.screen.getHeight());
     }
 }
