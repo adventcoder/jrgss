@@ -10,7 +10,6 @@ import java.awt.Toolkit;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
-import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 
 import javax.swing.Timer;
@@ -27,32 +26,10 @@ public class GameScreen extends Canvas {
         setIgnoreRepaint(true);
         setPreferredSize(new Dimension(544, 416));
 
-        hideCursor();
+        initCursor();
     }
 
-    public void clear() {
-        Graphics g = getGraphics();
-        g.clearRect(0, 0, getWidth(), getHeight());
-        g.dispose();
-    }
-
-    public BufferStrategy getBufferStrategy() {
-        BufferStrategy strategy = super.getBufferStrategy();
-        if (strategy == null) {
-            createBufferStrategy(2);
-            strategy = super.getBufferStrategy();
-        }
-        return strategy;
-    }
-
-    public void resize(int width, int height) {
-        setPreferredSize(new Dimension(width, height));
-        Point center = window.getCenterLocation();
-        window.pack();
-        window.setCenterLocation(center);
-    }
-
-    public void hideCursor() {
+    private void initCursor() {
         BufferedImage transparentImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Cursor transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(), "transparent");
 
@@ -89,5 +66,18 @@ public class GameScreen extends Canvas {
                 timer.restart();
             }
         });
+    }
+
+    public void resize(int width, int height) {
+        setPreferredSize(new Dimension(width, height));
+        Point center = window.getCenterLocation();
+        window.pack();
+        window.setCenterLocation(center);
+    }
+
+    public void clear() {
+        Graphics g = getGraphics();
+        g.clearRect(0, 0, getWidth(), getHeight());
+        g.dispose();
     }
 }

@@ -11,15 +11,15 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RubyGraphics {
-    public static GameScreen screen;
-
     public static void createGraphicsModule(Ruby runtime) {
         RubyModule mod = runtime.defineModule("Graphics");
         RGSS.graphicsModule = mod;
         mod.defineAnnotatedMethods(RubyGraphics.class);
     }
 
-    private static boolean running = true;
+    public static GameScreen screen;
+
+    private static volatile boolean running = true;
     private static boolean paused = false;
     private static Object pauseLock = new Object();
 
@@ -27,8 +27,7 @@ public class RubyGraphics {
     private static long frameCount;
     private static long frameStartTime;
 
-    public static void clear() {
-        screen.clear();
+    public static void reset() {
         frameRate = 30;
         frameCount = 0;
         frameStartTime = System.nanoTime();
@@ -38,18 +37,11 @@ public class RubyGraphics {
         running = false;
     }
 
-    public static void pause() {
+    public static void setPaused(boolean paused) {
         synchronized (pauseLock) {
-            paused = true;
-        }
-    }
-
-    public static synchronized void unpause() {
-        synchronized (pauseLock) {
-            paused = false;
+            RubyGraphics.paused = paused;
             pauseLock.notify();
         }
-
     }
 
     public static @JRubyMethod(meta = true) IRubyObject frame_rate(IRubyObject recv) {
@@ -101,14 +93,10 @@ public class RubyGraphics {
         long desiredFrameTime = 1000_000_000L / frameRate;
         long frameTime = System.nanoTime() - frameStartTime;
 
-        // if there's time left, sleep until the end of the frame
-        while (frameTime < desiredFrameTime) {
-            try {
-                sleep(desiredFrameTime - frameTime);
-            } catch (InterruptedException ignored) {
-                if (!running) throw new StopException();
-            }
-            frameTime = System.nanoTime() - frameStartTime;
+        // if there's time left, wait until the end of the frame
+        if (frameTime < desiredFrameTime) {
+            frameDelay(desiredFrameTime - frameTime, recv.getRuntime());
+            frameTime = desiredFrameTime;
         }
 
         // advance to the next frame
@@ -116,25 +104,33 @@ public class RubyGraphics {
         frameCount++;
         screen.window.setFps((int) (1000_000_000L / frameTime));
 
-        pauseLoop();
+        pauseWait(recv.getRuntime());
     }
 
-    private static void sleep(long time) throws InterruptedException {
-        Thread.sleep(time / 1000_000L, (int) (time % 1000_000L));
+    private static void frameDelay(long time, Ruby runtime) {
+        try {
+            Thread.sleep(time / 1000_000L, (int) (time % 1000_000L));
+        } catch (InterruptedException e) {
+            throw stopException(runtime);
+        }
     }
 
-    private static void pauseLoop() {
+    private static void pauseWait(Ruby runtime) {
         if (paused) {
             synchronized (pauseLock) {
-                while (paused) {
-                    try {
+                try {
+                    while (paused) {
                         pauseLock.wait();
-                    } catch (InterruptedException ignored) {
-                        if (!running) throw new StopException();
                     }
+                } catch (InterruptedException e) {
+                    throw stopException(runtime);
                 }
             }
         }
+    }
+
+    private static RuntimeException stopException(Ruby runtime) {
+        return running ? RGSS.newReset(runtime) : new RGSSStop();
     }
 
     @JRubyMethod(meta = true)
@@ -145,6 +141,10 @@ public class RubyGraphics {
         g.fillRect(0, 0, screen.getWidth(), screen.getHeight());
         render(g);
         return bmp;
+    }
+
+    public static void clearScreen() {
+        screen.clear();
     }
 
     private static void renderToScreen() {

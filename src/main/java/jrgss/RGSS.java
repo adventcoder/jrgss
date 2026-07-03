@@ -5,6 +5,8 @@ import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.internal.runtime.GlobalVariable.Scope;
+import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RGSS {
@@ -20,6 +22,11 @@ public class RGSS {
 
     public static RubyModule graphicsModule;
     public static RubyModule inputModule;
+
+    public static void init(Ruby runtime, String[] args) {
+        bootstrap(runtime);
+        setGlobalVariables(runtime, args);
+    }
 
     public static void bootstrap(Ruby runtime) {
         resetClass = defineSubclass("RGSSReset", runtime.getException());
@@ -38,6 +45,21 @@ public class RGSS {
 
     private static RubyClass defineSubclass(String name, RubyClass superClass) {
         return superClass.getRuntime().defineClass(name, superClass, superClass.getAllocator());
+    }
+
+    private static void setGlobalVariables(Ruby runtime, String[] args) {
+        boolean test = false;
+        boolean btest = false;
+        for (String arg : args) {
+            if (arg.equalsIgnoreCase("test")) {
+                test = true;
+            } else if (arg.equalsIgnoreCase("best")) {
+                test = true;
+                btest = true;
+            }
+        }
+        runtime.getGlobalVariables().define("$TEST", new ValueAccessor(runtime.newBoolean(test)), Scope.GLOBAL);
+        runtime.getGlobalVariables().define("$BTEST", new ValueAccessor(runtime.newBoolean(btest)), Scope.GLOBAL);
     }
 
     // Argument Checking

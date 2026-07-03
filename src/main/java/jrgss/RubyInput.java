@@ -37,7 +37,7 @@ public class RubyInput {
     private static Set<Integer> wasPressed = new HashSet<>();
     private static Set<Integer> pressed = new HashSet<>();
 
-    public static void clear() {
+    public static void reset() {
         wasPressed.clear();
         pressed.clear();
     }

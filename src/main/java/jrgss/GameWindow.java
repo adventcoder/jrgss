@@ -1,5 +1,6 @@
 package jrgss;
 
+import java.awt.Dialog;
 import java.awt.Frame;
 import java.awt.Point;
 import java.awt.event.KeyAdapter;
@@ -30,10 +31,12 @@ public class GameWindow extends Frame {
             @Override
             public void windowClosing(WindowEvent e) {
                 RubyGraphics.stop();
-
                 gameThread.interrupt();
+
+                // we don't want to dispose until until the game thread has terminated or there could be errors trying to access disposed resources
+                // however we give up if the game thread is taking too long
                 try {
-                    gameThread.join();
+                    gameThread.join(500);
                 } catch (InterruptedException ignored) {}
 
                 GameWindow.this.dispose();
@@ -46,12 +49,12 @@ public class GameWindow extends Frame {
 
             @Override
             public void windowDeactivated(WindowEvent e) {
-                RubyGraphics.pause();
+                RubyGraphics.setPaused(true);
             }
 
             @Override
             public void windowActivated(WindowEvent e) {
-                RubyGraphics.unpause();
+                RubyGraphics.setPaused(false);
             }
         });
 
@@ -60,21 +63,21 @@ public class GameWindow extends Frame {
             public void keyPressed(KeyEvent e) {
                 switch (e.getKeyCode()) {
                     case KeyEvent.VK_F1 -> {
-                        PropertiesDialog dialog = new PropertiesDialog(GameWindow.this);
+                        Dialog dialog = new GamePropertiesDialog(GameWindow.this);
                         dialog.setVisible(true);
                     }
                     case KeyEvent.VK_F2 -> {
                         toggleFpsShowing();
                     }
                     case KeyEvent.VK_F12 -> {
-                        // stop game thread
-                        // start new game thread
+                        gameThread.interrupt();
                     }
                 }
             }
         });
 
         setVisible(true);
+        screen.createBufferStrategy(2);
     }
 
     public Point getCenterLocation() {
