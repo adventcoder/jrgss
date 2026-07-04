@@ -3,7 +3,6 @@ package jrgss;
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Frame;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -42,31 +41,19 @@ public class RubyGraphics {
     private static long frameCount = 0;
     private static long frameStartTime = 0;
 
-    public static void init() {
-        canvas = new Canvas();
-        canvas.setFocusable(false);
-        canvas.setBackground(Color.BLACK);
-        canvas.setIgnoreRepaint(true);
-        canvas.setPreferredSize(new Dimension(544, 416));
-        reset();
-    }
+    public static void init(Window wnd) {
+        Thread gameThread = Thread.currentThread();
 
-    public static void reset() {
-        clear();
-        frameRate = 60;
-        frameCount = 0;
-        frameStartTime = System.nanoTime();
-    }
+        canvas = new GameScreen();
+        wnd.add(canvas);
+        wnd.pack();
+        wnd.setLocationRelativeTo(null);
 
-    public static Frame createFrame(String title) {
-        Thread thread = Thread.currentThread();
-        GameFrame frame = new GameFrame(title, canvas);
-        frame.addWindowListener(new WindowAdapter() {
+        wnd.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                thread.interrupt();
-                ThreadSupport.runUninterruptibly(thread::join);
-                frame.dispose();
+                gameThread.interrupt();
+                ThreadSupport.runUninterruptibly(gameThread::join);
             }
 
             @Override
@@ -79,7 +66,19 @@ public class RubyGraphics {
                 setPaused(true);
             }
         });
-        return frame;
+
+        wnd.setVisible(true);
+
+        canvas.createBufferStrategy(2);
+
+        reset();
+    }
+
+    public static void reset() {
+        clear();
+        frameRate = 60;
+        frameCount = 0;
+        frameStartTime = System.nanoTime();
     }
 
     private static void setPaused(boolean paused) {
@@ -198,15 +197,11 @@ public class RubyGraphics {
     }
 
     private static void render() {
-        BufferStrategy bs = canvas.getBufferStrategy();
-        if (bs == null) {
-            canvas.createBufferStrategy(2);
-            bs = canvas.getBufferStrategy();
-        }
-        Graphics2D g = (Graphics2D) bs.getDrawGraphics();
+        BufferStrategy buffer = canvas.getBufferStrategy();
+        Graphics2D g = (Graphics2D) buffer.getDrawGraphics();
         render(g);
         g.dispose();
-        bs.show();
+        buffer.show();
     }
 
     public static void render(Graphics2D g) {

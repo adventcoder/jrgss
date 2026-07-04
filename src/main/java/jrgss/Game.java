@@ -18,14 +18,12 @@ import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.backtrace.RubyStackTraceElement;
 
 public class Game {
-    private static Frame frame;
-
     public static void main(String[] args) throws Throwable {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
-        RGSS.init(args);
+        Frame frame = new GameFrame("Untitled");
 
-        frame = RubyGraphics.createFrame("Untitled");
+        RGSS.init(frame, args);
 
         setupFonts();
 
@@ -41,7 +39,7 @@ public class Game {
                     RGSS.reset();
                     continue;
                 } else {
-                    rubyError(exc);
+                    rubyError(frame, exc);
                 }
             } catch (InterruptedException e) {
                 break;
@@ -57,7 +55,7 @@ public class Game {
         }
     }
 
-    private static void rubyError(RubyException exc) {
+    private static void rubyError(Frame frame, RubyException exc) {
         String file = null;
         int line = 0;
         RubyStackTraceElement[] backtrace = exc.getBacktraceElements();

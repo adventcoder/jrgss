@@ -2,11 +2,11 @@ package jrgss;
 
 public interface ThreadSupport {
     @FunctionalInterface
-    public static interface Runnable {
+    public static interface InterruptibleRunnable {
         public void run() throws InterruptedException;
     }
 
-    public static void runUninterruptibly(Runnable runnable) {
+    public static void runUninterruptibly(InterruptibleRunnable runnable) {
         boolean interrupted = false;
         while (true) {
             try {
@@ -20,7 +20,7 @@ public interface ThreadSupport {
             Thread.currentThread().interrupt();
     }
 
-    public static void sleep(long time) throws InterruptedException {
-        Thread.sleep(time / 1000_000L, (int) (time % 1000_000L));
+    public static void sleep(long timeNanos) throws InterruptedException {
+        Thread.sleep(timeNanos / 1000_000L, (int) (timeNanos % 1000_000L));
     }
 }

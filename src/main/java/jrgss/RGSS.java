@@ -1,5 +1,7 @@
 package jrgss;
 
+import java.awt.Window;
+
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyInstanceConfig;
@@ -26,17 +28,17 @@ public class RGSS {
     public static RubyModule graphicsModule;
     public static RubyModule inputModule;
 
-    public static void init(String[] args) {
+    public static void init(Window wnd, String[] args) {
         runtime = Ruby.newInstance(getRubyConfig());
         bootstrap();
         setGlobalVariables(args);
-        RubyGraphics.init();
-        RubyInput.init();
+        RubyInput.init(wnd);
+        RubyGraphics.init(wnd);
     }
 
     public static void reset() {
-        RubyGraphics.reset();
         RubyInput.reset();
+        RubyGraphics.reset();
     }
 
     private static RubyInstanceConfig getRubyConfig() {

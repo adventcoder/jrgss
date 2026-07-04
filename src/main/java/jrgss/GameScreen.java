@@ -1,7 +1,9 @@
 package jrgss;
 
 import java.awt.Canvas;
+import java.awt.Color;
 import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Toolkit;
 import java.awt.event.MouseEvent;
@@ -14,12 +16,18 @@ public class GameScreen extends Canvas {
     private Timer hideCursorTimer;
 
     public GameScreen() {
+        setBackground(Color.BLACK);
+        setFocusable(false);
+        setIgnoreRepaint(true);
+        setPreferredSize(new Dimension(544, 416));
+
         hideCursorTimer = new Timer(500, ae -> hideCursor());
         hideCursorTimer.setRepeats(false);
     }
 
     public void processMouseEvent(MouseEvent e) {
         super.processMouseEvent(e);
+        System.out.println("mOUSE EVENT!");
         switch (e.getID()) {
             case MouseEvent.MOUSE_ENTERED -> {
                 hideCursorTimer.start();
@@ -27,7 +35,7 @@ public class GameScreen extends Canvas {
             case MouseEvent.MOUSE_EXITED -> {
                 hideCursorTimer.stop();
             }
-            case MouseEvent.MOUSE_MOVED -> {
+            case MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED -> {
                 showCursor();
                 hideCursorTimer.restart();
             }
