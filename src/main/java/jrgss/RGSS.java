@@ -2,6 +2,7 @@ package jrgss;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
 import org.jruby.exceptions.RaiseException;
@@ -10,6 +11,8 @@ import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RGSS {
+    public static Ruby runtime;
+
     public static RubyClass errorClass;
     public static RubyClass resetClass;
 
@@ -23,12 +26,26 @@ public class RGSS {
     public static RubyModule graphicsModule;
     public static RubyModule inputModule;
 
-    public static void init(Ruby runtime, String[] args) {
-        bootstrap(runtime);
-        setGlobalVariables(runtime, args);
+    public static void init(String[] args) {
+        runtime = Ruby.newInstance(getRubyConfig());
+        bootstrap();
+        setGlobalVariables(args);
+        RubyGraphics.init();
+        RubyInput.init();
     }
 
-    public static void bootstrap(Ruby runtime) {
+    public static void reset() {
+        RubyGraphics.reset();
+        RubyInput.reset();
+    }
+
+    private static RubyInstanceConfig getRubyConfig() {
+        RubyInstanceConfig config = new RubyInstanceConfig();
+
+        return config;
+    }
+
+    public static void bootstrap() {
         resetClass = defineSubclass("RGSSReset", runtime.getException());
         errorClass = defineSubclass("RGSSError", runtime.getStandardError());
 
@@ -47,7 +64,7 @@ public class RGSS {
         return superClass.getRuntime().defineClass(name, superClass, superClass.getAllocator());
     }
 
-    private static void setGlobalVariables(Ruby runtime, String[] args) {
+    private static void setGlobalVariables(String[] args) {
         boolean test = false;
         boolean btest = false;
         for (String arg : args) {

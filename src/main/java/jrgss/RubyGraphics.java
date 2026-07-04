@@ -1,8 +1,21 @@
 package jrgss;
 
+import java.awt.Canvas;
 import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Frame;
+import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.Window;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.awt.image.BufferStrategy;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+import javax.swing.SwingUtilities;
 
 import org.jruby.Ruby;
 import org.jruby.RubyModule;
@@ -17,30 +30,65 @@ public class RubyGraphics {
         mod.defineAnnotatedMethods(RubyGraphics.class);
     }
 
-    public static GameScreen screen;
+    private static Canvas canvas;
 
-    private static volatile boolean running = true;
-    private static boolean paused = false;
-    private static Object pauseLock = new Object();
+    private static AtomicBoolean resetRequested = new AtomicBoolean(false);
 
-    private static int frameRate;
-    private static long frameCount;
-    private static long frameStartTime;
+    private static ReentrantLock pauseLock = new ReentrantLock();
+    private static Condition unpaused = pauseLock.newCondition();
+    private static boolean paused = true;
+
+    private static int frameRate = 60;
+    private static long frameCount = 0;
+    private static long frameStartTime = 0;
+
+    public static void init() {
+        canvas = new Canvas();
+        canvas.setFocusable(false);
+        canvas.setBackground(Color.BLACK);
+        canvas.setIgnoreRepaint(true);
+        canvas.setPreferredSize(new Dimension(544, 416));
+        reset();
+    }
 
     public static void reset() {
-        frameRate = 30;
+        clear();
+        frameRate = 60;
         frameCount = 0;
         frameStartTime = System.nanoTime();
     }
 
-    public static void stop() {
-        running = false;
+    public static Frame createFrame(String title) {
+        Thread thread = Thread.currentThread();
+        GameFrame frame = new GameFrame(title, canvas);
+        frame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                thread.interrupt();
+                ThreadSupport.runUninterruptibly(thread::join);
+                frame.dispose();
+            }
+
+            @Override
+            public void windowActivated(WindowEvent e) {
+                setPaused(false);
+            }
+
+            @Override
+            public void windowDeactivated(WindowEvent e) {
+                setPaused(true);
+            }
+        });
+        return frame;
     }
 
-    public static void setPaused(boolean paused) {
-        synchronized (pauseLock) {
+    private static void setPaused(boolean paused) {
+        pauseLock.lock();
+        try {
             RubyGraphics.paused = paused;
-            pauseLock.notify();
+            if (!paused) unpaused.signalAll();
+        } finally {
+            pauseLock.unlock();
         }
     }
 
@@ -66,19 +114,26 @@ public class RubyGraphics {
 
     @JRubyMethod(meta = true)
     public static IRubyObject width(IRubyObject recv) {
-        return recv.getRuntime().newFixnum(screen.getWidth());
+        return recv.getRuntime().newFixnum(canvas.getWidth());
     }
 
     @JRubyMethod(meta = true)
     public static IRubyObject height(IRubyObject recv) {
-        return recv.getRuntime().newFixnum(screen.getHeight());
+        return recv.getRuntime().newFixnum(canvas.getHeight());
     }
 
     @JRubyMethod(meta = true)
     public static void resize_screen(IRubyObject recv, IRubyObject arg0, IRubyObject arg1) {
         int width = RubyNumeric.num2int(arg0);
         int height = RubyNumeric.num2int(arg1);
-        screen.resize(width, height);
+        canvas.setPreferredSize(new Dimension(width, height));
+        Window window = SwingUtilities.getWindowAncestor(canvas);
+        if (window != null) {
+            Point pos = window.getLocation();
+            Point center = new Point(pos.x + window.getWidth() / 2, pos.y + window.getHeight() / 2);
+            window.pack();
+            window.setLocation(center.x - window.getWidth() / 2, center.y - window.getHeight() / 2);
+        }
     }
 
     @JRubyMethod(meta = true)
@@ -87,79 +142,75 @@ public class RubyGraphics {
     }
 
     @JRubyMethod(meta = true)
-    public static void update(IRubyObject recv) {
-        renderToScreen();
+    public static void update(IRubyObject recv) throws InterruptedException {
+        render();
+        endFrame();
+        reset(recv.getRuntime());
+        pause();
+    }
 
+    private static void endFrame() throws InterruptedException {
         long desiredFrameTime = 1000_000_000L / frameRate;
         long frameTime = System.nanoTime() - frameStartTime;
 
         // if there's time left, wait until the end of the frame
         if (frameTime < desiredFrameTime) {
-            frameDelay(desiredFrameTime - frameTime, recv.getRuntime());
+            ThreadSupport.sleep(desiredFrameTime - frameTime);
             frameTime = desiredFrameTime;
         }
 
         // advance to the next frame
         frameStartTime += frameTime;
         frameCount++;
-        screen.window.setFps((int) (1000_000_000L / frameTime));
-
-        pauseWait(recv.getRuntime());
     }
 
-    private static void frameDelay(long time, Ruby runtime) {
+    private static void reset(Ruby runtime) {
+        if (resetRequested.compareAndExchange(true, false))
+            throw RGSS.newReset(runtime);
+    }
+
+    private static void pause() {
+        pauseLock.lock();
         try {
-            Thread.sleep(time / 1000_000L, (int) (time % 1000_000L));
-        } catch (InterruptedException e) {
-            throw stopException(runtime);
+            if (paused)
+                ThreadSupport.runUninterruptibly(unpaused::await);
+        } finally {
+            pauseLock.unlock();
         }
-    }
-
-    private static void pauseWait(Ruby runtime) {
-        if (paused) {
-            synchronized (pauseLock) {
-                try {
-                    while (paused) {
-                        pauseLock.wait();
-                    }
-                } catch (InterruptedException e) {
-                    throw stopException(runtime);
-                }
-            }
-        }
-    }
-
-    private static RuntimeException stopException(Ruby runtime) {
-        return running ? RGSS.newReset(runtime) : new RGSSStop();
     }
 
     @JRubyMethod(meta = true)
     public static IRubyObject snap_to_bitmap(IRubyObject recv) {
-        RubyBitmap bmp = RubyBitmap.newBitmap(recv.getRuntime(), screen.getWidth(), screen.getHeight());
+        RubyBitmap bmp = RubyBitmap.newBitmap(recv.getRuntime(), canvas.getWidth(), canvas.getHeight());
         Graphics2D g = bmp.getGraphics();
-        g.setColor(screen.getBackground());
-        g.fillRect(0, 0, screen.getWidth(), screen.getHeight());
+        g.setColor(canvas.getBackground());
+        g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
         render(g);
         return bmp;
     }
 
-    public static void clearScreen() {
-        screen.clear();
-    }
-
-    private static void renderToScreen() {
-        BufferStrategy bs = screen.getBufferStrategy();
-        Graphics2D g = (Graphics2D) bs.getDrawGraphics();
-        try {
-            render(g);
-        } finally {
+    public static void clear() {
+        Graphics g = canvas.getGraphics();
+        if (g != null) {
+            g.clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
             g.dispose();
         }
+    }
+
+    private static void render() {
+        BufferStrategy bs = canvas.getBufferStrategy();
+        if (bs == null) {
+            canvas.createBufferStrategy(2);
+            bs = canvas.getBufferStrategy();
+        }
+        Graphics2D g = (Graphics2D) bs.getDrawGraphics();
+        render(g);
+        g.dispose();
         bs.show();
     }
 
-    private static void render(Graphics2D g) {
+    public static void render(Graphics2D g) {
         g.setColor(Color.getHSBColor(frameCount % 360 / 360.0f, 1.0f, 1.0f));
-        g.fillOval(0, 0, screen.getWidth(), screen.getHeight());
+        g.fillOval(0, 0, canvas.getWidth(), canvas.getHeight());
     }
 }

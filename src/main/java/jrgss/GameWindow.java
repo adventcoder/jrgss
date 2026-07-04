@@ -9,20 +9,14 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
 public class GameWindow extends Frame {
-    public final Thread gameThread;
-    public final GameScreen screen;
-
     private boolean fpsShowing;
     private int fps;
 
-    public GameWindow(String title) {
-        gameThread = Thread.currentThread();
-
-        setTitle(title);
+    public GameWindow() {
+        setTitle("Untitled");
         setResizable(false);
 
-        screen = new GameScreen(this);
-        add(screen);
+        // add(RubyGraphics.screen);
 
         pack();
         setLocationRelativeTo(null);
@@ -30,13 +24,12 @@ public class GameWindow extends Frame {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                RubyGraphics.stop();
-                gameThread.interrupt();
+                // RubyGraphics.stop();
 
                 // we don't want to dispose until until the game thread has terminated or there could be errors trying to access disposed resources
                 // however we give up if the game thread is taking too long
                 try {
-                    gameThread.join(500);
+                    Thread.sleep(500);
                 } catch (InterruptedException ignored) {}
 
                 GameWindow.this.dispose();
@@ -47,15 +40,7 @@ public class GameWindow extends Frame {
                 System.exit(0);
             }
 
-            @Override
-            public void windowDeactivated(WindowEvent e) {
-                RubyGraphics.setPaused(true);
-            }
 
-            @Override
-            public void windowActivated(WindowEvent e) {
-                RubyGraphics.setPaused(false);
-            }
         });
 
         addKeyListener(new KeyAdapter() {
@@ -70,14 +55,27 @@ public class GameWindow extends Frame {
                         toggleFpsShowing();
                     }
                     case KeyEvent.VK_F12 -> {
-                        gameThread.interrupt();
+                        // gameThread.interrupt();
                     }
                 }
             }
         });
 
         setVisible(true);
-        screen.createBufferStrategy(2);
+    }
+
+    @Override
+    public void processWindowEvent(WindowEvent e) {
+            super.processWindowEvent(e);
+        switch (e.getID()) {
+            case WindowEvent.WINDOW_ACTIVATED:
+            case WindowEvent.WINDOW_DEACTIVATED:
+        }
+    }
+
+    @Override
+    public void processKeyEvent(KeyEvent e) {
+
     }
 
     public Point getCenterLocation() {

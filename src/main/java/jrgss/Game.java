@@ -2,6 +2,7 @@ package jrgss;
 
 import java.awt.Font;
 import java.awt.FontFormatException;
+import java.awt.Frame;
 import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,55 +13,47 @@ import java.nio.charset.StandardCharsets;
 import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 
-import org.jruby.Ruby;
 import org.jruby.RubyException;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.backtrace.RubyStackTraceElement;
 
 public class Game {
-    private static Ruby runtime;
-    private static GameWindow window;
+    private static Frame frame;
 
     public static void main(String[] args) throws Throwable {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
-        runtime = Ruby.newInstance();
+        RGSS.init(args);
 
-        window = new GameWindow("Untitled");
+        frame = RubyGraphics.createFrame("Untitled");
 
         setupFonts();
 
-        gameMain(args);
-    }
-
-    public static void gameMain(String[] args) throws IOException {
-        RGSS.init(runtime, args);
         while (true) {
-            RubyGraphics.reset();
-            RubyInput.reset();
             try {
                 for (int i = 0; i < 1; i++) {
                     runScript(i);
                 }
             } catch (RaiseException re) {
-                RubyGraphics.clearScreen();
+                RubyGraphics.clear();
                 RubyException exc = re.getException();
                 if (RGSS.resetClass.isInstance(exc)) {
+                    RGSS.reset();
                     continue;
                 } else {
-                    rubyError(re.getException());
+                    rubyError(exc);
                 }
-            } catch (RGSSStop e) {
+            } catch (InterruptedException e) {
                 break;
             }
         }
     }
 
-    private static void runScript(int index) throws IOException {
+    private static void runScript(int index) throws IOException, InterruptedException {
         String file = String.format("{%04d}", index);
         try (InputStream in = new FileInputStream("Scripts/" + file + " Main.rb")) {
             String script = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            runtime.executeScript(script, file);
+            RGSS.runtime.executeScript(script, file);
         }
     }
 
@@ -80,7 +73,7 @@ public class Game {
         String message = String.format("Script '%s' line %d: %s occurred.", "Main", line, exc.getMetaClass().getRealClass().getName());
         message += "\n\n" + exc.getMessageAsJavaString();
 
-        JOptionPane.showMessageDialog(window, message, window.getTitleWithoutFps(), JOptionPane.WARNING_MESSAGE);
+        JOptionPane.showMessageDialog(frame, message, frame.getTitle(), JOptionPane.WARNING_MESSAGE);
         System.exit((index << 16) | line);
     }
 
