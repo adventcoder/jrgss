@@ -1,18 +1,15 @@
 package jrgss;
 
-import java.awt.Window;
-import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 import org.jruby.Ruby;
+import org.jruby.RubyArray;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyModule;
 import org.jruby.RubySymbol;
@@ -20,6 +17,15 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RubyInput {
+    public static void createInputModule(Ruby runtime) {
+        RubyModule mod = runtime.defineModule("Input");
+        RubySupport.inputModule = mod;
+        mod.defineAnnotatedMethods(RubyInput.class);
+
+        for (RubyInput input : inputs.values())
+            mod.setConstant(input.symbol, runtime.fastNewSymbol(input.symbol));
+    }
+
     public static final int DOWN = 2, LEFT = 4, RIGHT = 6, UP = 8;
     public static final int A = 11, B = 12, C = 13, X = 14, Y = 15, Z = 16, L = 16, R = 18;
     public static final int SHIFT = 21, CTRL = 22, ALT = 23;
@@ -28,14 +34,12 @@ public class RubyInput {
     private static final int repeatDelay = 24;
     private static final int repeatRate = 6;
 
-    private static Set<Integer> keyDown = ConcurrentHashMap.newKeySet();
-
-    private final String name;
+    private final String symbol;
     private int[] keyCodes;
     private int pressCount;
 
-    public RubyInput(String name, int[] keyCodes) {
-        this.name = name;
+    public RubyInput(String symbol, int[] keyCodes) {
+        this.symbol = symbol;
         this.keyCodes = keyCodes;
     }
 
@@ -49,7 +53,7 @@ public class RubyInput {
 
     private boolean asyncPressed() {
         for (int keyCode : keyCodes)
-            if (keyDown.contains(keyCode))
+            if (Game.window.keyboardState.isPressed(keyCode))
                 return true;
         return false;
     }
@@ -85,7 +89,7 @@ public class RubyInput {
 
         inputs.put(SHIFT, new RubyInput("SHIFT", new int[] { KeyEvent.VK_SHIFT }));
         inputs.put(CTRL, new RubyInput("CTRL", new int[] { KeyEvent.VK_CONTROL }));
-        inputs.put(UP, new RubyInput("ALT", new int[] { KeyEvent.VK_ALT }));
+        inputs.put(ALT, new RubyInput("ALT", new int[] { KeyEvent.VK_ALT }));
 
         inputs.put(F5, new RubyInput("F5", new int[] { KeyEvent.VK_F5 }));
         inputs.put(F6, new RubyInput("F6", new int[] { KeyEvent.VK_F6 }));
@@ -94,11 +98,11 @@ public class RubyInput {
         inputs.put(F9, new RubyInput("F9", new int[] { KeyEvent.VK_F9 }));
     }
 
-    private static final Map<String, RubyInput> inputsByName = new HashMap<>();
+    private static final Map<String, RubyInput> inputsByName = new IdentityHashMap<>();
 
     static {
         for (RubyInput input : inputs.values())
-            inputsByName.put(input.name, input);
+            inputsByName.put(input.symbol, input);
     }
 
     private static final int[] buttonKeyCodes = new int[] {
@@ -107,41 +111,6 @@ public class RubyInput {
         KeyEvent.VK_A, KeyEvent.VK_S, KeyEvent.VK_D,
         KeyEvent.VK_Q, KeyEvent.VK_W
     };
-
-    public static void createInputModule(Ruby runtime) {
-        RubyModule mod = runtime.defineModule("Input");
-        RGSS.inputModule = mod;
-        mod.defineAnnotatedMethods(RubyInput.class);
-
-        for (RubyInput input : inputs.values())
-            mod.setConstant(input.name, runtime.newSymbol(input.name));
-    }
-
-    public static void init(Window wnd) {
-        wnd.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent event) {
-                keyDown.add(event.getKeyCode());
-            }
-
-            @Override
-            public void keyReleased(KeyEvent event) {
-                keyDown.remove(event.getKeyCode());
-            }
-        });
-        wnd.addWindowFocusListener(new WindowAdapter() {
-            @Override
-            public void windowLostFocus(WindowEvent e) {
-                keyDown.clear();
-            }
-        });
-        assignButtons(new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, C, C, B, B, A, C, B, 0, 0, 0, X, Y, Z, L, R });
-        reset();
-    }
-
-    public static void reset() {
-        inputs.values().forEach(RubyInput::resetInput);
-    }
 
     public static void assignButtons(byte[] buttonMap) {
         Map<Integer, List<Integer>> map = new HashMap<>();
@@ -154,6 +123,14 @@ public class RubyInput {
             inputs.get(entry.getKey()).keyCodes = entry.getValue().stream().mapToInt(Integer::intValue).toArray();
     }
 
+    static {
+        assignButtons(new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, C, C, B, B, A, C, B, 0, 0, 0, X, Y, Z, L, R });
+    }
+
+    public static void reset() {
+        inputs.values().forEach(RubyInput::resetInput);
+    }
+
     @JRubyMethod(meta = true)
     public static void update(IRubyObject recv) {
         inputs.values().forEach(RubyInput::updateInput);
@@ -161,43 +138,68 @@ public class RubyInput {
 
     @JRubyMethod(meta = true, name = "press?")
     public static IRubyObject press_p(IRubyObject recv, IRubyObject obj) {
-        RubyInput inp = getInput(obj);
-        return recv.getRuntime().newBoolean(inp != null && inp.isPressed());
+        return test(recv, obj, RubyInput::isPressed);
     }
 
     @JRubyMethod(meta = true, name = "trigger?")
     public static IRubyObject trigger_p(IRubyObject recv, IRubyObject obj) {
-        RubyInput inp = getInput(obj);
-        return recv.getRuntime().newBoolean(inp != null && inp.isRepeated());
+        return test(recv, obj, RubyInput::isTriggered);
     }
 
     @JRubyMethod(meta = true, name = "repeat?")
     public static IRubyObject repeat_p(IRubyObject recv, IRubyObject obj) {
+        return test(recv, obj, RubyInput::isRepeated);
+    }
+
+    private static IRubyObject test(IRubyObject recv, IRubyObject obj, Predicate<RubyInput> pred) {
         RubyInput inp = getInput(obj);
-        return recv.getRuntime().newBoolean(inp != null && inp.isRepeated());
+        return recv.getRuntime().newBoolean(inp != null && inp.isPressed());
+    }
+
+    @JRubyMethod(meta = true)
+    public static IRubyObject pressed(IRubyObject recv) {
+        return list(recv, RubyInput::isPressed);
+    }
+
+    @JRubyMethod(meta = true)
+    public static IRubyObject triggered(IRubyObject recv) {
+        return list(recv, RubyInput::isPressed);
+    }
+
+    @JRubyMethod(meta = true)
+    public static IRubyObject repeated(IRubyObject recv) {
+        return list(recv, RubyInput::isRepeated);
+    }
+
+    private static IRubyObject list(IRubyObject recv, Predicate<RubyInput> pred) {
+        RubySymbol[] inps = inputs.values().stream()
+            .filter(pred)
+            .map(inp -> recv.getRuntime().fastNewSymbol(inp.symbol))
+            .toArray(RubySymbol[]::new);
+        return RubyArray.newArrayMayCopy(recv.getRuntime(), inps);
     }
 
     @JRubyMethod(meta = true, name = "dir8")
     public static IRubyObject dir8(IRubyObject recv) {
         int dx = (inputs.get(RIGHT).isPressed() ? 1 : 0) - (inputs.get(LEFT).isPressed() ? 1 : 0);
         int dy = (inputs.get(UP).isPressed() ? 1 : 0) - (inputs.get(DOWN).isPressed() ? 1 : 0);
-        return recv.getRuntime().newFixnum(5 + dx - 3*dy);
+        return recv.getRuntime().newFixnum(dx == 0 && dy == 0 ? 0 : 5 + 3*dy + dx);
     }
 
     @JRubyMethod(meta = true, name = "dir4")
     public static IRubyObject dir4(IRubyObject recv) {
-        int d8 = ((RubyFixnum) dir8(recv)).getIntValue();
-        return recv.getRuntime().newFixnum(switch (d8) {
-            case 1 -> tieBreak(DOWN, LEFT);
-            case 3 -> tieBreak(DOWN, RIGHT);
-            case 7 -> tieBreak(UP, LEFT);
-            case 9 -> tieBreak(UP, RIGHT);
+        RubyFixnum d8 = (RubyFixnum) dir8(recv);
+        return switch (d8.getIntValue()) {
+            case 1 -> recv.getRuntime().newFixnum(tieBreak(DOWN, LEFT));
+            case 3 -> recv.getRuntime().newFixnum(tieBreak(DOWN, RIGHT));
+            case 7 -> recv.getRuntime().newFixnum(tieBreak(UP, LEFT));
+            case 9 -> recv.getRuntime().newFixnum(tieBreak(UP, RIGHT));
             default -> d8;
-        });
+        };
     }
 
     private static int tieBreak(int inp1, int inp2) {
-        return inputs.get(inp1).pressCount >= inputs.get(inp2).pressCount ? inp1 : inp2;
+        return inputs.get(inp1).pressCount <= inputs.get(inp2).pressCount ? inp1 : inp2;
     }
 
     private static RubyInput getInput(IRubyObject obj) {

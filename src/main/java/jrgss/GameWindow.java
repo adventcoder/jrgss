@@ -1,46 +1,55 @@
 package jrgss;
 
+import java.awt.Canvas;
+import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dialog;
+import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Point;
+import java.awt.Toolkit;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.image.BufferedImage;
+
+import javax.swing.Timer;
 
 public class GameWindow extends Frame {
-    private boolean fpsShowing;
-    private int fps;
+    public final Canvas screen;
+    public final KeyboardState keyboardState;
 
-    public GameWindow() {
-        setTitle("Untitled");
+    public GameWindow(String title) {
+        super(title);
         setResizable(false);
 
-        // add(RubyGraphics.screen);
-
+        screen = new Canvas();
+        screen.setFocusable(false);
+        screen.setIgnoreRepaint(true);
+        screen.setBackground(Color.BLACK);
+        screen.setPreferredSize(new Dimension(544, 416));
+        add(screen);
         pack();
         setLocationRelativeTo(null);
 
         addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosing(WindowEvent e) {
-                // RubyGraphics.stop();
-
-                // we don't want to dispose until until the game thread has terminated or there could be errors trying to access disposed resources
-                // however we give up if the game thread is taking too long
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException ignored) {}
-
-                GameWindow.this.dispose();
+            public void windowActivated(WindowEvent e) {
+                Game.setActive(true);
             }
 
             @Override
-            public void windowClosed(WindowEvent e) {
-                System.exit(0);
+            public void windowDeactivated(WindowEvent e) {
+                Game.setActive(false);
             }
 
-
+            @Override
+            public void windowClosing(WindowEvent e) {
+                Game.stop();
+            }
         });
 
         addKeyListener(new KeyAdapter() {
@@ -52,68 +61,48 @@ public class GameWindow extends Frame {
                         dialog.setVisible(true);
                     }
                     case KeyEvent.VK_F2 -> {
-                        toggleFpsShowing();
+                        //toggleFpsShowing();
                     }
                     case KeyEvent.VK_F12 -> {
-                        // gameThread.interrupt();
+                        Game.reset();
                     }
                 }
             }
         });
 
+
+        BufferedImage transparentImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Cursor transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(0, 0), "transparent");
+
+        Timer hideCursorTimer = new Timer(500, ae -> screen.setCursor(transparentCursor));
+        hideCursorTimer.setRepeats(false);
+
+        MouseAdapter mouseAdapter = new MouseAdapter() {
+            public @Override void mouseEntered(MouseEvent e) { mouseActivated(e); }
+            public @Override void mousePressed(MouseEvent e) { mouseActivated(e); }
+            public @Override void mouseReleased(MouseEvent e) { mouseActivated(e); }
+            public @Override void mouseMoved(MouseEvent e) { mouseActivated(e); }
+            public @Override void mouseDragged(MouseEvent e) { mouseActivated(e); }
+
+            private void mouseActivated(MouseEvent e) {
+                screen.setCursor(null);
+                hideCursorTimer.restart();
+            }
+        };
+
+        screen.addMouseListener(mouseAdapter);
+        screen.addMouseMotionListener(mouseAdapter);
+
+        keyboardState = new KeyboardState(this);
+
         setVisible(true);
+        screen.createBufferStrategy(2);
     }
 
-    @Override
-    public void processWindowEvent(WindowEvent e) {
-            super.processWindowEvent(e);
-        switch (e.getID()) {
-            case WindowEvent.WINDOW_ACTIVATED:
-            case WindowEvent.WINDOW_DEACTIVATED:
-        }
-    }
-
-    @Override
-    public void processKeyEvent(KeyEvent e) {
-
-    }
-
-    public Point getCenterLocation() {
+    public void repack() {
         Point pos = getLocation();
-        return new Point(pos.x + getWidth() / 2, pos.y + getHeight() / 2);
-    }
-
-    public void setCenterLocation(Point center) {
+        Point center = new Point(pos.x + getWidth() / 2, pos.y + getHeight() / 2);
+        pack();
         setLocation(center.x - getWidth() / 2, center.y - getHeight() / 2);
-    }
-
-    public String getTitleWithoutFps() {
-        return fpsShowing ? removeFps(getTitle()) : getTitle();
-    }
-
-    public void toggleFpsShowing() {
-        if (fpsShowing) {
-            setTitle(removeFps(getTitle()));
-            fpsShowing = false;
-        } else {
-            setTitle(addFps(getTitle(), fps));
-            fpsShowing = true;
-        }
-    }
-
-    public void setFps(int fps) {
-        int oldFps = fps;
-        this.fps = fps;
-        if (fpsShowing && fps != oldFps)
-            setTitle(addFps(removeFps(getTitle()), fps));
-    }
-
-    private static String addFps(String title, int fps) {
-        return title + " - " + fps  + " FPS";
-    }
-
-    private static String removeFps(String title) {
-        int i = title.lastIndexOf(" - ");
-        return title.substring(0, i);
     }
 }

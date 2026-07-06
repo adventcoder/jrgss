@@ -1,10 +1,7 @@
 package jrgss;
 
-import java.awt.Window;
-
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
-import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
 import org.jruby.exceptions.RaiseException;
@@ -12,11 +9,12 @@ import org.jruby.internal.runtime.GlobalVariable.Scope;
 import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.runtime.builtin.IRubyObject;
 
-public class RGSS {
-    public static Ruby runtime;
+import lombok.experimental.UtilityClass;
 
-    public static RubyClass errorClass;
-    public static RubyClass resetClass;
+@UtilityClass
+public class RubySupport {
+    public static RubyClass rgssErrorClass;
+    public static RubyClass rgssResetClass;
 
     public static RubyClass rectClass;
     public static RubyClass colorClass;
@@ -28,28 +26,9 @@ public class RGSS {
     public static RubyModule graphicsModule;
     public static RubyModule inputModule;
 
-    public static void init(Window wnd, String[] args) {
-        runtime = Ruby.newInstance(getRubyConfig());
-        bootstrap();
-        setGlobalVariables(args);
-        RubyInput.init(wnd);
-        RubyGraphics.init(wnd);
-    }
-
-    public static void reset() {
-        RubyInput.reset();
-        RubyGraphics.reset();
-    }
-
-    private static RubyInstanceConfig getRubyConfig() {
-        RubyInstanceConfig config = new RubyInstanceConfig();
-
-        return config;
-    }
-
-    public static void bootstrap() {
-        resetClass = defineSubclass("RGSSReset", runtime.getException());
-        errorClass = defineSubclass("RGSSError", runtime.getStandardError());
+    public static void bootstrap(Ruby runtime) {
+        rgssResetClass = defineSubclass("RGSSReset", runtime.getException());
+        rgssErrorClass = defineSubclass("RGSSError", runtime.getStandardError());
 
         RubyRect.createRectClass(runtime);
         RubyColor.createColorClass(runtime);
@@ -66,19 +45,8 @@ public class RGSS {
         return superClass.getRuntime().defineClass(name, superClass, superClass.getAllocator());
     }
 
-    private static void setGlobalVariables(String[] args) {
-        boolean test = false;
-        boolean btest = false;
-        for (String arg : args) {
-            if (arg.equalsIgnoreCase("test")) {
-                test = true;
-            } else if (arg.equalsIgnoreCase("best")) {
-                test = true;
-                btest = true;
-            }
-        }
-        runtime.getGlobalVariables().define("$TEST", new ValueAccessor(runtime.newBoolean(test)), Scope.GLOBAL);
-        runtime.getGlobalVariables().define("$BTEST", new ValueAccessor(runtime.newBoolean(btest)), Scope.GLOBAL);
+    public static void setGlobalVariable(Ruby runtime, String name, boolean value) {
+        runtime.getGlobalVariables().define(name, new ValueAccessor(runtime.newBoolean(value)), Scope.GLOBAL);
     }
 
     // Argument Checking
@@ -114,12 +82,12 @@ public class RGSS {
 
     // Errors
 
-    public static RaiseException newReset(Ruby runtime) {
-        return runtime.newRaiseException(resetClass, "");
+    public static RaiseException newRGSSReset(Ruby runtime) {
+        return runtime.newRaiseException(rgssResetClass, "");
     }
 
-    public static RaiseException newError(Ruby runtime, String message) {
-        return runtime.newRaiseException(errorClass, message);
+    public static RaiseException newRGSSError(Ruby runtime, String message) {
+        return runtime.newRaiseException(rgssErrorClass, message);
     }
 
     public static RaiseException newTypeConversionError(IRubyObject obj, RubyClass target) {

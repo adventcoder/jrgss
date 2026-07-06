@@ -1,12 +1,15 @@
 package jrgss;
 
-public interface ThreadSupport {
+import lombok.experimental.UtilityClass;
+
+@UtilityClass
+public class ThreadSupport {
     @FunctionalInterface
-    public static interface InterruptibleRunnable {
+    public static interface Runnable {
         public void run() throws InterruptedException;
     }
 
-    public static void runUninterruptibly(InterruptibleRunnable runnable) {
+    public static void runUninterruptibly(Runnable runnable) {
         boolean interrupted = false;
         while (true) {
             try {

@@ -25,7 +25,7 @@ public class RubyFont extends RubyObject {
 
     public static void createFontClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Font", runtime.getObject(), RubyFont::new);
-        RGSS.fontClass = cls;
+        RubySupport.fontClass = cls;
         cls.defineAnnotatedMethods(RubyFont.class);
         initDefaultFont(runtime);
     }
@@ -80,7 +80,7 @@ public class RubyFont extends RubyObject {
     }
 
     public RubyFont(Ruby runtime, boolean useObjectSpace) {
-        this(runtime, RGSS.fontClass, useObjectSpace);
+        this(runtime, RubySupport.fontClass, useObjectSpace);
     }
 
     public RubyFont(Ruby runtime) {
@@ -116,7 +116,7 @@ public class RubyFont extends RubyObject {
         if (obj instanceof RubyFont font) {
             set(font);
         } else {
-            throw getRuntime().newTypeError(obj, RGSS.fontClass);
+            throw getRuntime().newTypeError(obj, RubySupport.fontClass);
         }
         return this;
     }
@@ -143,7 +143,7 @@ public class RubyFont extends RubyObject {
 
     @JRubyMethod(name = "size=")
     public IRubyObject set_size(IRubyObject obj) {
-        size = RGSS.checkRange(obj, "size", 6, 96);
+        size = RubySupport.checkRange(obj, "size", 6, 96);
         refreshSize();
         return obj;
     }
@@ -189,11 +189,10 @@ public class RubyFont extends RubyObject {
     @JRubyMethod(meta = true)
     public static IRubyObject list(IRubyObject recv) {
         String[] names = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
-        RubyArray<?> array = recv.getRuntime().newArray(names.length);
-        for (String name : names) {
-            array.append(RubyString.newString(recv.getRuntime(), name));
-        }
-        return array;
+        RubyString[] nameObjs = new RubyString[names.length];
+        for (int i = 0; i < names.length; i++)
+            nameObjs[i] = RubyString.newString(recv.getRuntime(), names[i]);
+        return RubyArray.newArrayMayCopy(recv.getRuntime(), nameObjs);
     }
 
     @JRubyMethod(name = "exist?", meta = true)

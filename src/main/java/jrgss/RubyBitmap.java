@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
-import java.awt.GraphicsEnvironment;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.TexturePaint;
@@ -54,12 +53,12 @@ public class RubyBitmap extends RubyObject {
 
     public static RubyBitmap newBitmap(Ruby runtime, int width, int height) {
         //TODO
-        return new RubyBitmap(runtime, RGSS.bitmapClass);
+        return new RubyBitmap(runtime, RubySupport.bitmapClass);
     }
 
     @JRubyMethod
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
-        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        GraphicsConfiguration gc = Game.screen.getGraphicsConfiguration();
         image = gc.createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
         font.initialize(new IRubyObject[0]);
     }
@@ -72,10 +71,10 @@ public class RubyBitmap extends RubyObject {
             if (image == null)
                 throw new IOException("unsupported image format");
         } catch (IOException ioe) {
-            throw RGSS.newError(getRuntime(), "failed to create bitmap: " + ioe.getMessage());
+            throw RubySupport.newRGSSError(getRuntime(), "failed to create bitmap: " + ioe.getMessage());
         }
 
-        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        GraphicsConfiguration gc = Game.screen.getGraphicsConfiguration();
         if (gc.getColorModel().isCompatibleRaster(image.getRaster())) {
             image.coerceData(gc.getColorModel().isAlphaPremultiplied());
         } else {
@@ -97,7 +96,7 @@ public class RubyBitmap extends RubyObject {
             flushGraphics();
             font.initialize_copy(other.font);
         } else {
-            throw getRuntime().newTypeError(orig, RGSS.bitmapClass);
+            throw getRuntime().newTypeError(orig, RubySupport.bitmapClass);
         }
         return this;
     }
@@ -124,7 +123,7 @@ public class RubyBitmap extends RubyObject {
 
     private void checkDisposed() {
         if (isDisposed())
-            throw RGSS.newError(getRuntime(), "disposed bitmap");
+            throw RubySupport.newRGSSError(getRuntime(), "disposed bitmap");
     }
 
     public Graphics2D getGraphics() {
@@ -196,7 +195,7 @@ public class RubyBitmap extends RubyObject {
         checkDisposed();
         int x = RubyNumeric.num2int(arg0);
         int y = RubyNumeric.num2int(arg1);
-        RubyColor color = RGSS.asColor(arg2);
+        RubyColor color = RubySupport.asColor(arg2);
 
         if ((x >= 0) && (y >= 0) && (x < image.getWidth()) && (y < image.getHeight()))
             image.setRGB(x, y, color.getARGB());
@@ -228,10 +227,10 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void fill_rect(IRubyObject... args) {
         if (args.length == 2) {
-            fill_rect(RGSS.asRect(args[0]), RGSS.asColor(args[1]));
+            fill_rect(RubySupport.asRect(args[0]), RubySupport.asColor(args[1]));
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 5, 5);
-            fill_rect(RubyRect.newRectLight(getRuntime(), args, 0), RGSS.asColor(args[4]));
+            fill_rect(RubyRect.newRectLight(getRuntime(), args, 0), RubySupport.asColor(args[4]));
         }
     }
 
@@ -245,10 +244,10 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void gradient_fill_rect(IRubyObject... args) {
         if (args.length >= 3 && args.length <= 4) {
-            gradient_fill_rect(RGSS.asRect(args[0]), RGSS.asColor(args[1]), RGSS.asColor(args[2]), args.length >= 4 ? args[3] : getRuntime().getFalse());
+            gradient_fill_rect(RubySupport.asRect(args[0]), RubySupport.asColor(args[1]), RubySupport.asColor(args[2]), args.length >= 4 ? args[3] : getRuntime().getFalse());
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 6, 7);
-            gradient_fill_rect(RubyRect.newRectLight(getRuntime(), args, 0), RGSS.asColor(args[4]), RGSS.asColor(args[5]), args.length >= 7 ? args[6] : getRuntime().getFalse());
+            gradient_fill_rect(RubyRect.newRectLight(getRuntime(), args, 0), RubySupport.asColor(args[4]), RubySupport.asColor(args[5]), args.length >= 7 ? args[6] : getRuntime().getFalse());
         }
     }
 
@@ -272,7 +271,7 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void blt(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, 4, 5);
-        blt(RubyNumeric.num2int(args[0]), RubyNumeric.num2int(args[1]), RGSS.asBitmap(args[2]), RGSS.asRect(args[3]), args.length >= 5 ? RubyNumeric.num2int(args[4]) : 255);
+        blt(RubyNumeric.num2int(args[0]), RubyNumeric.num2int(args[1]), RubySupport.asBitmap(args[2]), RubySupport.asRect(args[3]), args.length >= 5 ? RubyNumeric.num2int(args[4]) : 255);
     }
 
     public void blt(int x, int y, RubyBitmap src, RubyRect srcRect, int opacity) {
@@ -283,7 +282,7 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void stretch_blt(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, 3, 4);
-        stretch_blt(RGSS.asRect(args[0]), RGSS.asBitmap(args[1]), RGSS.asRect(args[2]), args.length >= 4 ? RubyNumeric.num2int(args[3]) : 255);
+        stretch_blt(RubySupport.asRect(args[0]), RubySupport.asBitmap(args[1]), RubySupport.asRect(args[2]), args.length >= 4 ? RubyNumeric.num2int(args[3]) : 255);
     }
 
     public void stretch_blt(RubyRect dstRect, RubyBitmap src, RubyRect srcRect, int opacity) {
@@ -301,7 +300,7 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void tile_blt(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, 3, 4);
-        tile_blt(RGSS.asRect(args[0]), RGSS.asBitmap(args[1]), RGSS.asRect(args[2]), args.length >= 4 ? RubyNumeric.num2int(args[3]) : 255);
+        tile_blt(RubySupport.asRect(args[0]), RubySupport.asBitmap(args[1]), RubySupport.asRect(args[2]), args.length >= 4 ? RubyNumeric.num2int(args[3]) : 255);
     }
 
     public void tile_blt(RubyRect rect, RubyBitmap src, RubyRect srcRect, int opacity) {
@@ -316,7 +315,7 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void draw_text(IRubyObject... args) {
         if (args.length >= 2 && args.length <= 3) {
-            draw_text(RGSS.asRect(args[0]), args[1], args.length >= 3 ? RubyNumeric.num2int(args[2]) : 0);
+            draw_text(RubySupport.asRect(args[0]), args[1], args.length >= 3 ? RubyNumeric.num2int(args[2]) : 0);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 5, 6);
             draw_text(RubyRect.newRectLight(getRuntime(), args, 0), args[4], args.length >= 6 ? RubyNumeric.num2int(args[5]) : 0);
@@ -464,7 +463,7 @@ public class RubyBitmap extends RubyObject {
             if (!writeBySuffix(file, suffix))
                 throw new IOException("unsupported file extension: " + suffix);
         } catch (IOException ioe) {
-            throw RGSS.newError(getRuntime(), "failed saving bitmap: " + ioe.getMessage());
+            throw RubySupport.newRGSSError(getRuntime(), "failed saving bitmap: " + ioe.getMessage());
         }
     }
 

@@ -17,7 +17,7 @@ import lombok.EqualsAndHashCode;
 public class RubyColor extends RubyData {
     public static void createColorClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Color", runtime.getObject(), RubyColor::new);
-        RGSS.colorClass = cls;
+        RubySupport.colorClass = cls;
         cls.defineAnnotatedMethods(RubyColor.class);
     }
 
@@ -32,7 +32,7 @@ public class RubyColor extends RubyData {
     }
 
     public RubyColor(Ruby runtime) {
-        super(runtime, RGSS.colorClass);
+        super(runtime, RubySupport.colorClass);
     }
 
     public static RubyColor newColor(Ruby runtime, double red, double green, double blue, double alpha) {
@@ -141,7 +141,7 @@ public class RubyColor extends RubyData {
             this.alpha = color.alpha;
             this.color = color.color;
         } else {
-            throw obj.getRuntime().newTypeError(obj, RGSS.colorClass);
+            throw obj.getRuntime().newTypeError(obj, RubySupport.colorClass);
         }
         return this;
     }

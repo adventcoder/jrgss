@@ -1,81 +1,141 @@
 package jrgss;
 
+import java.awt.Canvas;
 import java.awt.Font;
 import java.awt.FontFormatException;
-import java.awt.Frame;
 import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 
+import org.jruby.Ruby;
 import org.jruby.RubyException;
+import org.jruby.RubyInstanceConfig;
+import org.jruby.RubySystemExit;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.backtrace.RubyStackTraceElement;
+import org.jruby.runtime.builtin.IRubyObject;
 
 public class Game {
+    public static Logger logger = Logger.getLogger(Game.class.getSimpleName());
+    public static Thread thread;
+    public static Ruby runtime;
+    public static GameWindow window;
+    public static Canvas screen;
+
+    public static AtomicBoolean stopping = new AtomicBoolean(false);
+    public static AtomicBoolean resetting = new AtomicBoolean(false);
+
+    private static ReentrantLock activeLock = new ReentrantLock();
+    private static Condition activated = activeLock.newCondition();
+    private static volatile boolean active = false;
+
+    public static boolean stop() {
+        return stopping.compareAndSet(false, true);
+    }
+
+    public static boolean reset() {
+        return resetting.compareAndSet(false, true);
+    }
+
+    public static boolean clearStopping() {
+        return stopping.compareAndSet(true, false);
+    }
+
+    public static boolean clearResetting() {
+        return resetting.compareAndSet(true, false);
+    }
+
+    public static void setActive(boolean newActive) {
+        activeLock.lock();
+        try {
+            active = newActive;
+            if (newActive)
+                activated.signalAll();
+        } finally {
+            activeLock.unlock();
+        }
+    }
+
+    public static void waitWhileInactive() throws InterruptedException {
+        activeLock.lock();
+        try {
+            while (!active)
+                activated.await();
+        } finally {
+            activeLock.unlock();
+        }
+    }
+
     public static void main(String[] args) throws Throwable {
+        thread = Thread.currentThread();
+
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
-        Frame frame = new GameFrame("Untitled");
+        RubyInstanceConfig config = new RubyInstanceConfig();
+        runtime = Ruby.newInstance(config);
 
-        RGSS.init(frame, args);
+        window = new GameWindow("Untitled");
+        screen = window.screen;
 
+        setGlobalVariables(args);
+        RubySupport.bootstrap(runtime);
+
+        // setupRTP();
         setupFonts();
 
         while (true) {
             try {
-                for (int i = 0; i < 1; i++) {
-                    runScript(i);
-                }
+                runScripts();
             } catch (RaiseException re) {
-                RubyGraphics.clear();
+                RubyGraphics.clearScreen();
                 RubyException exc = re.getException();
-                if (RGSS.resetClass.isInstance(exc)) {
-                    RGSS.reset();
+                if (RubySupport.rgssResetClass.isInstance(exc)) {
+                    RubyGraphics.reset();
+                    RubyInput.reset();
                     continue;
+                } else if (runtime.getSystemExit().isInstance(exc)) {
+                    IRubyObject status = ((RubySystemExit) exc).status();
+                    logger.log(Level.INFO, "Ruby exitted with status: " + status);
                 } else {
-                    rubyError(frame, exc);
+                    rubyError(exc);
                 }
-            } catch (InterruptedException e) {
+            } catch (RGSSStop e) {
+                RubyGraphics.clearScreen();
                 break;
             }
         }
+
+        System.exit(0);
     }
 
-    private static void runScript(int index) throws IOException, InterruptedException {
-        String file = String.format("{%04d}", index);
-        try (InputStream in = new FileInputStream("Scripts/" + file + " Main.rb")) {
-            String script = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            RGSS.runtime.executeScript(script, file);
-        }
-    }
-
-    private static void rubyError(Frame frame, RubyException exc) {
-        String file = null;
-        int line = 0;
-        RubyStackTraceElement[] backtrace = exc.getBacktraceElements();
-        for (RubyStackTraceElement el : backtrace) {
-            if (el.getFileName().startsWith("{") && el.getFileName().endsWith("}")) {
-                file = el.getFileName();
-                line = el.getLineNumber();
-                break;
+    public static void setGlobalVariables(String[] args) {
+        boolean test = false;
+        boolean btest = false;
+        for (String arg : args) {
+            if (arg.equalsIgnoreCase("test")) {
+                test = true;
+            } else if (arg.equalsIgnoreCase("btest")) {
+                test = true;
+                btest = true;
             }
         }
-        int index = Integer.parseInt(file.substring(1, file.length() - 1));
-
-        String message = String.format("Script '%s' line %d: %s occurred.", "Main", line, exc.getMetaClass().getRealClass().getName());
-        message += "\n\n" + exc.getMessageAsJavaString();
-
-        JOptionPane.showMessageDialog(frame, message, frame.getTitle(), JOptionPane.WARNING_MESSAGE);
-        System.exit((index << 16) | line);
+        RubySupport.setGlobalVariable(runtime, "$TEST", test);
+        RubySupport.setGlobalVariable(runtime, "$BTEST", btest);
     }
 
     public static void setupFonts() {
+        //TODO: integrate with RTP
         File fontsDir = new File("Fonts");
 
         String[] fileNames = fontsDir.list();
@@ -93,13 +153,39 @@ public class Game {
                 try {
                     font = Font.createFont(Font.TRUETYPE_FONT, fontFile);
                 } catch (IOException | FontFormatException e) {
-                    e.printStackTrace();
+                    logger.log(Level.WARNING, "Error creating font", e);
                     continue;
                 }
 
-                GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-                ge.registerFont(font);
+                GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
             }
         }
+    }
+
+    private static void runScripts() throws IOException {
+        try (InputStream in = new FileInputStream("Scripts/{0000} Main.rb")) {
+            String script = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            runtime.executeScript(script, "{0000}");
+        }
+    }
+
+    private static void rubyError(RubyException exc) {
+        String file = null;
+        int line = 0;
+        RubyStackTraceElement[] backtrace = exc.getBacktraceElements();
+        for (RubyStackTraceElement el : backtrace) {
+            if (el.getFileName().startsWith("{") && el.getFileName().endsWith("}")) {
+                file = el.getFileName();
+                line = el.getLineNumber();
+                break;
+            }
+        }
+        int index = Integer.parseInt(file.substring(1, file.length() - 1));
+
+        String message = String.format("Script '%s' line %d: %s occurred.", "Main", line, exc.getMetaClass().getRealClass().getName());
+        message += "\n\n" + exc.getMessageAsJavaString();
+
+        JOptionPane.showMessageDialog(window, message, window.getTitle(), JOptionPane.WARNING_MESSAGE);
+        System.exit((index << 16) | line);
     }
 }

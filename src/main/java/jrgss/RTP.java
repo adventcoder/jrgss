@@ -10,7 +10,7 @@ public class RTP {
         File file = findFileAt(runtime.getCurrentDirectory(), path);
         if (file != null) return file;
         //IMPL: RPG Maker would show an error message box and exit here instead of raising
-        throw RGSS.newError(runtime, "Unable to find file: " + path);
+        throw RubySupport.newRGSSError(runtime, "Unable to find file: " + path);
     }
  
     private static File findFileAt(String cwd, String path) {
