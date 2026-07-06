@@ -1,10 +1,8 @@
 package jrgss;
 
 import java.awt.event.KeyEvent;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 
@@ -15,6 +13,9 @@ import org.jruby.RubyModule;
 import org.jruby.RubySymbol;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.builtin.IRubyObject;
+
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 
 public class RubyInput {
     public static void createInputModule(Ruby runtime) {
@@ -27,7 +28,7 @@ public class RubyInput {
     }
 
     public static final int DOWN = 2, LEFT = 4, RIGHT = 6, UP = 8;
-    public static final int A = 11, B = 12, C = 13, X = 14, Y = 15, Z = 16, L = 16, R = 18;
+    public static final int A = 11, B = 12, C = 13, X = 14, Y = 15, Z = 16, L = 17, R = 18;
     public static final int SHIFT = 21, CTRL = 22, ALT = 23;
     public static final int F5 = 25, F6 = 26, F7 = 27, F8 = 28, F9 = 29;
 
@@ -53,6 +54,7 @@ public class RubyInput {
 
     private boolean asyncPressed() {
         for (int keyCode : keyCodes)
+            //TODO: should probably take a snapshot at start of frame
             if (Game.window.keyboardState.isPressed(keyCode))
                 return true;
         return false;
@@ -73,10 +75,10 @@ public class RubyInput {
     private static final Map<Integer, RubyInput> inputs = new HashMap<>();
 
     static {
-        inputs.put(DOWN, new RubyInput("DOWN", new int[] { KeyEvent.VK_DOWN, KeyEvent.VK_NUMPAD2 }));
-        inputs.put(LEFT, new RubyInput("LEFT", new int[] { KeyEvent.VK_LEFT, KeyEvent.VK_NUMPAD4 }));
-        inputs.put(RIGHT, new RubyInput("RIGHT", new int[] { KeyEvent.VK_RIGHT, KeyEvent.VK_NUMPAD6 }));
-        inputs.put(UP, new RubyInput("UP", new int[] { KeyEvent.VK_UP, KeyEvent.VK_NUMPAD8 }));
+        inputs.put(DOWN, new RubyInput("DOWN", new int[] { KeyEvent.VK_DOWN, KeyEvent.VK_NUMPAD2, KeyEvent.VK_KP_DOWN }));
+        inputs.put(LEFT, new RubyInput("LEFT", new int[] { KeyEvent.VK_LEFT, KeyEvent.VK_NUMPAD4, KeyEvent.VK_KP_LEFT }));
+        inputs.put(RIGHT, new RubyInput("RIGHT", new int[] { KeyEvent.VK_RIGHT, KeyEvent.VK_NUMPAD6, KeyEvent.VK_KP_RIGHT }));
+        inputs.put(UP, new RubyInput("UP", new int[] { KeyEvent.VK_UP, KeyEvent.VK_NUMPAD8, KeyEvent.VK_KP_UP }));
 
         inputs.put(A, new RubyInput("A", new int[0]));
         inputs.put(B, new RubyInput("B", new int[0]));
@@ -113,14 +115,17 @@ public class RubyInput {
     };
 
     public static void assignButtons(byte[] buttonMap) {
-        Map<Integer, List<Integer>> map = new HashMap<>();
-        for (int i = 0; i < Math.min(buttonMap.length - 10, buttonKeyCodes.length); i++) {
-            int input = Byte.toUnsignedInt(buttonMap[i + 10]);
-            if (input >= A && input <= R)
-                map.computeIfAbsent(input, k -> new ArrayList<>()).add(buttonKeyCodes[i]);
+        for (int inp = A; inp <= R; inp++) {
+            IntList keyCodes = new IntArrayList();
+            int limit = 10 + Math.min(buttonMap.length - 10, buttonKeyCodes.length);
+            for (int i = 10; i < limit; i++) {
+                if (Byte.toUnsignedInt(buttonMap[i]) == inp)
+                    keyCodes.add(buttonKeyCodes[i - 10]);
+            }
+            if (inp == L) keyCodes.add(KeyEvent.VK_PAGE_UP);
+            if (inp == R) keyCodes.add(KeyEvent.VK_PAGE_DOWN);
+            inputs.get(inp).keyCodes = keyCodes.toIntArray();
         }
-        for (Map.Entry<Integer, List<Integer>> entry : map.entrySet())
-            inputs.get(entry.getKey()).keyCodes = entry.getValue().stream().mapToInt(Integer::intValue).toArray();
     }
 
     static {
@@ -153,7 +158,7 @@ public class RubyInput {
 
     private static IRubyObject test(IRubyObject recv, IRubyObject obj, Predicate<RubyInput> pred) {
         RubyInput inp = getInput(obj);
-        return recv.getRuntime().newBoolean(inp != null && inp.isPressed());
+        return recv.getRuntime().newBoolean(inp != null && pred.test(inp));
     }
 
     @JRubyMethod(meta = true)
@@ -163,7 +168,7 @@ public class RubyInput {
 
     @JRubyMethod(meta = true)
     public static IRubyObject triggered(IRubyObject recv) {
-        return list(recv, RubyInput::isPressed);
+        return list(recv, RubyInput::isTriggered);
     }
 
     @JRubyMethod(meta = true)

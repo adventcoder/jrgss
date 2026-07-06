@@ -64,16 +64,16 @@ public class RubyTable extends RubyData {
         int oldxsize = xsize, oldysize = ysize, oldzsize = zsize;
         short[] oldData = data;
         initialize(args);
-        int minxsize = Math.min(xsize, oldxsize);
-        int minysize = Math.min(ysize, oldysize);
-        int minzsize = Math.min(zsize, oldzsize);
-        for (int z = 0; z < minzsize; z++) {
+        int xlimit = Math.min(xsize, oldxsize);
+        int ylimit = Math.min(ysize, oldysize);
+        int zlimit = Math.min(zsize, oldzsize);
+        for (int z = 0; z < zlimit; z++) {
             int yoffset = z*ysize;
             int oldyoffset = z*oldysize;
-            for (int y = 0; y < minysize; y++) {
+            for (int y = 0; y < ylimit; y++) {
                 int xoffset = (yoffset + y)*xsize;
                 int oldxoffset = (oldyoffset + y)*oldxsize;
-                System.arraycopy(oldData, oldxoffset, data, xoffset, minxsize);
+                System.arraycopy(oldData, oldxoffset, data, xoffset, xlimit);
             }
         }
     }
