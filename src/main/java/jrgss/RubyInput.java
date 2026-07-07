@@ -4,6 +4,7 @@ import java.awt.event.KeyEvent;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import org.jruby.Ruby;
@@ -48,14 +49,13 @@ public class RubyInput {
         pressCount = 0;
     }
 
-    public void updateInput() {
-        pressCount = asyncPressed() ? pressCount + 1 : 0;
+    public void updateInput(Set<Integer> keyboardState) {
+        pressCount = isPressed(keyboardState) ? pressCount + 1 : 0;
     }
 
-    private boolean asyncPressed() {
+    private boolean isPressed(Set<Integer> keyboardState) {
         for (int keyCode : keyCodes)
-            //TODO: should probably take a snapshot at start of frame
-            if (Game.window.keyboardState.isPressed(keyCode))
+            if (keyboardState.contains(keyCode))
                 return true;
         return false;
     }
@@ -133,12 +133,15 @@ public class RubyInput {
     }
 
     public static void reset() {
-        inputs.values().forEach(RubyInput::resetInput);
+        for (RubyInput input : inputs.values())
+            input.resetInput();
     }
 
     @JRubyMethod(meta = true)
     public static void update(IRubyObject recv) {
-        inputs.values().forEach(RubyInput::updateInput);
+        Set<Integer> keyboardState = Game.window.getKeyboardState();
+        for (RubyInput input : inputs.values())
+            input.updateInput(keyboardState);
     }
 
     @JRubyMethod(meta = true, name = "press?")

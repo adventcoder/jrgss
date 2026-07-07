@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
+import java.awt.GraphicsEnvironment;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.TexturePaint;
@@ -58,7 +59,7 @@ public class RubyBitmap extends RubyObject {
 
     @JRubyMethod
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
-        GraphicsConfiguration gc = Game.screen.getGraphicsConfiguration();
+        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         image = gc.createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
         font.initialize(new IRubyObject[0]);
     }
@@ -74,7 +75,7 @@ public class RubyBitmap extends RubyObject {
             throw RubySupport.newRGSSError(getRuntime(), "failed to create bitmap: " + ioe.getMessage());
         }
 
-        GraphicsConfiguration gc = Game.screen.getGraphicsConfiguration();
+        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         if (gc.getColorModel().isCompatibleRaster(image.getRaster())) {
             image.coerceData(gc.getColorModel().isAlphaPremultiplied());
         } else {

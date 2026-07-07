@@ -31,14 +31,13 @@ public class Game {
     public static Thread thread;
     public static Ruby runtime;
     public static GameWindow window;
-    public static Canvas screen;
 
     public static AtomicBoolean stopping = new AtomicBoolean(false);
     public static AtomicBoolean resetting = new AtomicBoolean(false);
 
     private static ReentrantLock activeLock = new ReentrantLock();
     private static Condition activated = activeLock.newCondition();
-    private static volatile boolean active = false;
+    private static boolean active = false;
 
     public static boolean stop() {
         return stopping.compareAndSet(false, true);
@@ -86,7 +85,6 @@ public class Game {
         runtime = Ruby.newInstance(config);
 
         window = new GameWindow("Untitled");
-        screen = window.screen;
 
         setGlobalVariables(args);
         RubySupport.bootstrap(runtime);
@@ -98,7 +96,7 @@ public class Game {
             try {
                 runScripts();
             } catch (RaiseException re) {
-                RubyGraphics.clearScreen();
+                window.clearScreen();
                 RubyException exc = re.getException();
                 if (RubySupport.rgssResetClass.isInstance(exc)) {
                     RubyGraphics.reset();
@@ -111,11 +109,11 @@ public class Game {
                     rubyError(exc);
                 }
             } catch (RGSSStop e) {
-                RubyGraphics.clearScreen();
                 break;
             }
         }
 
+        // window.dispose()
         System.exit(0);
     }
 
@@ -185,7 +183,7 @@ public class Game {
         String message = String.format("Script '%s' line %d: %s occurred.", "Main", line, exc.getMetaClass().getRealClass().getName());
         message += "\n\n" + exc.getMessageAsJavaString();
 
-        JOptionPane.showMessageDialog(window, message, window.getTitle(), JOptionPane.WARNING_MESSAGE);
+        JOptionPane.showMessageDialog(window, message, window.getOriginalTitle(), JOptionPane.WARNING_MESSAGE);
         System.exit((index << 16) | line);
     }
 }
