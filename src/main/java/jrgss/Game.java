@@ -37,10 +37,10 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
         transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(0, 0), "transparent");
     }
 
-    public static void main(String[] args) throws Throwable {
+    public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
-        //TODO: ini parsing
+        // Ini ini = new Ini(new File("Game.ini"));
 
         //setupRTP(rtpName);
         setupFonts();
@@ -80,16 +80,15 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
     }
 
     public final String title;
-    private final ParsedArgs args;
+    public final ParsedArgs args;
 
     public GameFrame frame = null;
 
-    private final AtomicBoolean stop = new AtomicBoolean(false);
     private final AtomicBoolean reset = new AtomicBoolean(false);
 
     private final ReentrantLock activeLock = new ReentrantLock();
     private final Condition activated = activeLock.newCondition();
-    private volatile boolean active = false;
+    private boolean active = false;
 
     public final Set<Integer> pressed = ConcurrentHashMap.newKeySet();
 
@@ -123,7 +122,8 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
                         frame.toggleFpsShowing();
                     }
                     case KeyEvent.VK_F12 -> {
-                        reset();
+                        if (!reset())
+                            System.err.println("Ignoring repeated reset");
                     }
                 }
             }
@@ -176,16 +176,8 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
         JOptionPane.showMessageDialog(frame, message, title, messageType);
     }
 
-    public boolean stop() {
-        return stop.compareAndSet(false, true);
-    }
-
     public boolean reset() {
         return reset.compareAndSet(false, true);
-    }
-
-    public boolean pollStop() {
-        return stop.compareAndSet(true, false);
     }
 
     public boolean pollReset() {

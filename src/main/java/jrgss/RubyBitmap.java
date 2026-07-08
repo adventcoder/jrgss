@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
-import java.awt.GraphicsEnvironment;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.TexturePaint;
@@ -49,18 +48,13 @@ public class RubyBitmap extends RubyObject {
 
     public RubyBitmap(Ruby runtime, RubyClass metaClass) {
         super(runtime, metaClass);
-        font = new RubyFont(runtime);
-    }
-
-    public static RubyBitmap newBitmap(Ruby runtime, int width, int height) {
-        //TODO
-        return new RubyBitmap(runtime, RubySupport.bitmapClass);
+        font = new RubyFont(runtime, RubySupport.fontClass);
     }
 
     @JRubyMethod
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
-        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
-        image = gc.createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
+        Game game = RubySupport.getGame(getRuntime());
+        image = game.getGraphicsConfiguration().createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
         font.initialize(new IRubyObject[0]);
     }
 
@@ -75,7 +69,8 @@ public class RubyBitmap extends RubyObject {
             throw RubySupport.newRGSSError(getRuntime(), "failed to create bitmap: " + ioe.getMessage());
         }
 
-        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        Game game = RubySupport.getGame(getRuntime());
+        GraphicsConfiguration gc = game.getGraphicsConfiguration();
         if (gc.getColorModel().isCompatibleRaster(image.getRaster())) {
             image.coerceData(gc.getColorModel().isAlphaPremultiplied());
         } else {
@@ -329,7 +324,7 @@ public class RubyBitmap extends RubyObject {
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.SrcOver);
         g.setClip(rect.x, rect.y, rect.width, rect.height);
-        g.setFont(font.getFont());
+        g.setFont(font.getFont(g.getFontRenderContext()));
 
         //TODO: scale to fit width
 
@@ -394,10 +389,12 @@ public class RubyBitmap extends RubyObject {
         String str = obj.asString().asJavaString();
 
         Graphics2D g = getGraphics();
-        Rectangle2D bounds = font.getFont().getStringBounds(str, g.getFontRenderContext());
-        // hack since values should be very close to integers but otherwise we want to round up
-        int width = (int) (bounds.getWidth() + 0.99);
-        int height = (int) (bounds.getHeight() + 0.99);
+        Rectangle2D.Float bounds = (Rectangle2D.Float) font.getFont(g.getFontRenderContext()).getStringBounds(str, g.getFontRenderContext());
+
+        // these should be close to integers so round up but with a small tolerance
+        float tolerance = 0.01f;
+        int width = (int) (bounds.getWidth() + 1.0f - tolerance);
+        int height = (int) (bounds.getHeight() + 1.0f - tolerance);
 
         return RubyRect.newRect(getRuntime(), 0, 0, width, height);
     }

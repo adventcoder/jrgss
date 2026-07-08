@@ -86,6 +86,21 @@ public class RubyGraphics {
     }
 
     @JRubyMethod(meta = true)
+    public static IRubyObject snap_to_bitmap(IRubyObject recv) {
+        Game game = RubySupport.getGame(recv.getRuntime());
+
+        RubyBitmap bmp = new RubyBitmap(recv.getRuntime(), RubySupport.bitmapClass);
+        bmp.initialize(recv.getRuntime().newFixnum(game.getWidth()), recv.getRuntime().newFixnum(game.getHeight()));
+
+        Graphics2D g = bmp.getGraphics();
+        g.setColor(game.getBackground());
+        g.fillRect(0, 0, game.getWidth(), game.getHeight());
+        render(g);
+
+        return bmp;
+    }
+
+    @JRubyMethod(meta = true)
     public static void frame_reset(IRubyObject recv) {
         frameStartTime = System.nanoTime();
     }
@@ -101,7 +116,8 @@ public class RubyGraphics {
 
         // if there's time left, wait until the end of the frame
         if (frameTime < desiredFrameTime) {
-            ThreadSupport.sleepNanos(desiredFrameTime - frameTime);
+            long sleepTime = desiredFrameTime - frameTime;
+            Thread.sleep(sleepTime / 1000_000L, (int) (sleepTime % 1000_000L));
             frameTime = desiredFrameTime;
         }
 
@@ -112,8 +128,6 @@ public class RubyGraphics {
 
         // at start of frame check game status
 
-        if (game.pollStop())
-            throw new RGSSStop();
         if (game.pollReset())
             throw RubySupport.newRGSSReset(recv.getRuntime());
 
@@ -132,17 +146,6 @@ public class RubyGraphics {
         } else {
             fps++;
         }
-    }
-
-    @JRubyMethod(meta = true)
-    public static IRubyObject snap_to_bitmap(IRubyObject recv) {
-        Game game = RubySupport.getGame(recv.getRuntime());
-        RubyBitmap bmp = RubyBitmap.newBitmap(recv.getRuntime(), game.getWidth(), game.getHeight());
-        Graphics2D g = bmp.getGraphics();
-        g.setColor(game.getBackground());
-        g.fillRect(0, 0, game.getWidth(), game.getHeight());
-        render(g);
-        return bmp;
     }
 
     public static void render(BufferStrategy bs) {

@@ -20,12 +20,13 @@ import javax.swing.border.EmptyBorder;
 
 public class GamePropertiesDialog extends JDialog {
     private final JCheckBox fullscreenBox;
-    private final JCheckBox vsyncBox;
     private final JCheckBox musicBox;
     private final JCheckBox soundsBox;
 
     public GamePropertiesDialog(Frame owner) {
         super(owner, "Game Properties", true);
+
+        // props = GameProperties.load()
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBorder(new EmptyBorder(6, 6, 6, 6));
@@ -42,10 +43,6 @@ public class GamePropertiesDialog extends JDialog {
         fullscreenBox.setAlignmentX(Component.LEFT_ALIGNMENT);
         fullscreenBox.setOpaque(false);
 
-        vsyncBox = new JCheckBox("Enable VSync");
-        vsyncBox.setAlignmentX(Component.LEFT_ALIGNMENT);
-        vsyncBox.setOpaque(false);
-
         musicBox = new JCheckBox("Play Music");
         musicBox.setAlignmentX(Component.LEFT_ALIGNMENT);
         musicBox.setOpaque(false);
@@ -55,8 +52,6 @@ public class GamePropertiesDialog extends JDialog {
         soundsBox.setOpaque(false);
 
         general.add(fullscreenBox);
-        general.add(Box.createVerticalStrut(6));
-        general.add(vsyncBox);
         general.add(Box.createVerticalStrut(6));
         general.add(musicBox);
         general.add(Box.createVerticalStrut(6));
@@ -78,10 +73,11 @@ public class GamePropertiesDialog extends JDialog {
 
         okButton.addActionListener(e -> {
             System.out.println("fullscreen: " + fullscreenBox.isSelected());
-            System.out.println("vsync: " + vsyncBox.isSelected());
             System.out.println("music: " + musicBox.isSelected());
             System.out.println("sounds: " + soundsBox.isSelected());
 
+            // props.save();
+            // RubyInput.assignButtons(props.buttonAsign);
             dispose();
         });
 

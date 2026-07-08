@@ -49,13 +49,9 @@ public class GameFrame extends Frame {
                 gameThread.start();
             }
             case WindowEvent.WINDOW_CLOSING -> {
-                if (game.stop()) {
-                    try {
-                        gameThread.join(1000);
-                    } catch (InterruptedException ignored) {
-                    }
-                    dispose();
-                }
+                // gameThread.interrupt();
+                // gameThread.join();
+                System.exit(0);
             }
             case WindowEvent.WINDOW_CLOSED -> {
                 // we use the exit status for ruby errors. in all other cases we exit with 0.

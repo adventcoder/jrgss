@@ -106,20 +106,13 @@ public class RubyInput {
             inputsByName.put(input.symbol, input);
     }
 
-    private static final int[] buttonKeyCodes = new int[] {
-        KeyEvent.VK_SPACE, KeyEvent.VK_ENTER, KeyEvent.VK_ESCAPE, KeyEvent.VK_NUMPAD0, KeyEvent.VK_SHIFT,
-        KeyEvent.VK_Z, KeyEvent.VK_X, KeyEvent.VK_C, KeyEvent.VK_V, KeyEvent.VK_B,
-        KeyEvent.VK_A, KeyEvent.VK_S, KeyEvent.VK_D,
-        KeyEvent.VK_Q, KeyEvent.VK_W
-    };
-
     public static void assignButtons(byte[] buttonMap) {
         for (int inp = A; inp <= R; inp++) {
             IntList keyCodes = new IntArrayList();
-            int limit = 10 + Math.min(buttonMap.length - 10, buttonKeyCodes.length);
+            int limit = 10 + Math.min(buttonMap.length - 10, GameProperties.buttonKeyCodes.length);
             for (int i = 10; i < limit; i++) {
                 if (Byte.toUnsignedInt(buttonMap[i]) == inp)
-                    keyCodes.add(buttonKeyCodes[i - 10]);
+                    keyCodes.add(GameProperties.buttonKeyCodes[i - 10]);
             }
             if (inp == L) keyCodes.add(KeyEvent.VK_PAGE_UP);
             if (inp == R) keyCodes.add(KeyEvent.VK_PAGE_DOWN);
