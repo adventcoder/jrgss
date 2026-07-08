@@ -5,14 +5,14 @@ import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
 import org.jruby.exceptions.RaiseException;
-import org.jruby.internal.runtime.GlobalVariable.Scope;
-import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.runtime.builtin.IRubyObject;
 
 import lombok.experimental.UtilityClass;
 
 @UtilityClass
 public class RubySupport {
+    public static Game game;
+
     public static RubyClass rgssErrorClass;
     public static RubyClass rgssResetClass;
 
@@ -25,6 +25,11 @@ public class RubySupport {
 
     public static RubyModule graphicsModule;
     public static RubyModule inputModule;
+
+    public static Game getGame(Ruby runtime) {
+        //TODO: store this per runtime...?
+        return game;
+    }
 
     public static void bootstrap(Ruby runtime) {
         rgssResetClass = defineSubclass("RGSSReset", runtime.getException());
@@ -43,10 +48,6 @@ public class RubySupport {
 
     private static RubyClass defineSubclass(String name, RubyClass superClass) {
         return superClass.getRuntime().defineClass(name, superClass, superClass.getAllocator());
-    }
-
-    public static void setGlobalVariable(Ruby runtime, String name, boolean value) {
-        runtime.getGlobalVariables().define(name, new ValueAccessor(runtime.newBoolean(value)), Scope.GLOBAL);
     }
 
     // Argument Checking

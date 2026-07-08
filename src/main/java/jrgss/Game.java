@@ -1,138 +1,57 @@
 package jrgss;
 
+import java.awt.AWTEvent;
 import java.awt.Canvas;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dialog;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontFormatException;
+import java.awt.Graphics;
 import java.awt.GraphicsEnvironment;
+import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.swing.JOptionPane;
+import javax.swing.Timer;
 import javax.swing.UIManager;
 
-import org.jruby.Ruby;
-import org.jruby.RubyException;
-import org.jruby.RubyInstanceConfig;
-import org.jruby.RubySystemExit;
-import org.jruby.exceptions.RaiseException;
-import org.jruby.runtime.backtrace.RubyStackTraceElement;
-import org.jruby.runtime.builtin.IRubyObject;
+public class Game extends Canvas implements Callable<Integer>, KeyboardState {
+    private static Cursor transparentCursor;
 
-public class Game {
-    public static Logger logger = Logger.getLogger(Game.class.getSimpleName());
-    public static Thread thread;
-    public static Ruby runtime;
-    public static GameWindow window;
-
-    public static AtomicBoolean stopping = new AtomicBoolean(false);
-    public static AtomicBoolean resetting = new AtomicBoolean(false);
-
-    private static ReentrantLock activeLock = new ReentrantLock();
-    private static Condition activated = activeLock.newCondition();
-    private static boolean active = false;
-
-    public static boolean stop() {
-        return stopping.compareAndSet(false, true);
-    }
-
-    public static boolean reset() {
-        return resetting.compareAndSet(false, true);
-    }
-
-    public static boolean clearStopping() {
-        return stopping.compareAndSet(true, false);
-    }
-
-    public static boolean clearResetting() {
-        return resetting.compareAndSet(true, false);
-    }
-
-    public static void setActive(boolean newActive) {
-        activeLock.lock();
-        try {
-            active = newActive;
-            if (newActive)
-                activated.signalAll();
-        } finally {
-            activeLock.unlock();
-        }
-    }
-
-    public static void waitWhileInactive() throws InterruptedException {
-        activeLock.lock();
-        try {
-            while (!active)
-                activated.await();
-        } finally {
-            activeLock.unlock();
-        }
+    static {
+        BufferedImage transparentImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(0, 0), "transparent");
     }
 
     public static void main(String[] args) throws Throwable {
-        thread = Thread.currentThread();
-
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
-        RubyInstanceConfig config = new RubyInstanceConfig();
-        runtime = Ruby.newInstance(config);
+        //TODO: ini parsing
 
-        window = new GameWindow("Untitled");
-
-        setGlobalVariables(args);
-        RubySupport.bootstrap(runtime);
-
-        // setupRTP();
+        //setupRTP(rtpName);
         setupFonts();
 
-        while (true) {
-            try {
-                runScripts();
-            } catch (RaiseException re) {
-                window.clearScreen();
-                RubyException exc = re.getException();
-                if (RubySupport.rgssResetClass.isInstance(exc)) {
-                    RubyGraphics.reset();
-                    RubyInput.reset();
-                    continue;
-                } else if (runtime.getSystemExit().isInstance(exc)) {
-                    IRubyObject status = ((RubySystemExit) exc).status();
-                    logger.log(Level.INFO, "Ruby exitted with status: " + status);
-                } else {
-                    rubyError(exc);
-                }
-            } catch (RGSSStop e) {
-                break;
-            }
-        }
+        Game game = new Game("Untitled", new ParsedArgs(args));
 
-        // window.dispose()
-        System.exit(0);
+        GameFrame frame = new GameFrame(game);
+        frame.setVisible(true);
     }
 
-    public static void setGlobalVariables(String[] args) {
-        boolean test = false;
-        boolean btest = false;
-        for (String arg : args) {
-            if (arg.equalsIgnoreCase("test")) {
-                test = true;
-            } else if (arg.equalsIgnoreCase("btest")) {
-                test = true;
-                btest = true;
-            }
-        }
-        RubySupport.setGlobalVariable(runtime, "$TEST", test);
-        RubySupport.setGlobalVariable(runtime, "$BTEST", btest);
-    }
-
-    public static void setupFonts() {
+    private static void setupFonts() {
         //TODO: integrate with RTP
         File fontsDir = new File("Fonts");
 
@@ -151,7 +70,7 @@ public class Game {
                 try {
                     font = Font.createFont(Font.TRUETYPE_FONT, fontFile);
                 } catch (IOException | FontFormatException e) {
-                    logger.log(Level.WARNING, "Error creating font", e);
+                    e.printStackTrace();
                     continue;
                 }
 
@@ -160,30 +79,159 @@ public class Game {
         }
     }
 
-    private static void runScripts() throws IOException {
-        try (InputStream in = new FileInputStream("Scripts/{0000} Main.rb")) {
-            String script = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            runtime.executeScript(script, "{0000}");
+    public final String title;
+    private final ScriptEngine scriptEngine;
+
+    public GameFrame frame = null;
+
+    private final AtomicBoolean stop = new AtomicBoolean(false);
+    private final AtomicBoolean reset = new AtomicBoolean(false);
+
+    private final ReentrantLock activeLock = new ReentrantLock();
+    private final Condition activated = activeLock.newCondition();
+    private volatile boolean active = false;
+
+    public final Set<Integer> pressed = ConcurrentHashMap.newKeySet();
+
+    private final Timer hideCursorTimer = new Timer(500, this::hideCursor);
+    {
+        hideCursorTimer.setRepeats(false);
+    }
+
+    public Game(String title, ParsedArgs args) {
+        this.title = title;
+
+        setPreferredSize(new Dimension(544, 416));
+        setBackground(Color.BLACK);
+        setIgnoreRepaint(true);
+        enableEvents(AWTEvent.KEY_EVENT_MASK | AWTEvent.FOCUS_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
+
+        scriptEngine = new ScriptEngine(this);
+        scriptEngine.setGlobalVariable("$TEST", args.test);
+        scriptEngine.setGlobalVariable("$BTEST", args.btest);
+    }
+
+    @Override
+    public void processKeyEvent(KeyEvent e) {
+        super.processKeyEvent(e);
+        switch (e.getID()) {
+            case KeyEvent.KEY_PRESSED -> {
+                pressed.add(e.getKeyCode());
+                switch (e.getKeyCode()) {
+                    case KeyEvent.VK_F1 -> {
+                        Dialog dialog = new GamePropertiesDialog(frame);
+                        dialog.setVisible(true);
+                    }
+                    case KeyEvent.VK_F2 -> {
+                        frame.toggleFpsShowing();
+                    }
+                    case KeyEvent.VK_F12 -> {
+                        reset();
+                    }
+                }
+            }
+            case KeyEvent.KEY_RELEASED -> {
+                pressed.remove(e.getKeyCode());
+            }
         }
     }
 
-    private static void rubyError(RubyException exc) {
-        String file = null;
-        int line = 0;
-        RubyStackTraceElement[] backtrace = exc.getBacktraceElements();
-        for (RubyStackTraceElement el : backtrace) {
-            if (el.getFileName().startsWith("{") && el.getFileName().endsWith("}")) {
-                file = el.getFileName();
-                line = el.getLineNumber();
-                break;
+    @Override
+    public void processMouseEvent(MouseEvent e) {
+        super.processMouseEvent(e);
+        switch (e.getID()) {
+            case MouseEvent.MOUSE_ENTERED, MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED -> {
+                mouseActivated(e);
             }
         }
-        int index = Integer.parseInt(file.substring(1, file.length() - 1));
+    }
 
-        String message = String.format("Script '%s' line %d: %s occurred.", "Main", line, exc.getMetaClass().getRealClass().getName());
-        message += "\n\n" + exc.getMessageAsJavaString();
+    @Override
+    public void processMouseMotionEvent(MouseEvent e) {
+        super.processMouseEvent(e);
+        switch (e.getID()) {
+            case MouseEvent.MOUSE_MOVED, MouseEvent.MOUSE_DRAGGED -> {
+                mouseActivated(e);
+            }
+        }
+    }
 
-        JOptionPane.showMessageDialog(window, message, window.getOriginalTitle(), JOptionPane.WARNING_MESSAGE);
-        System.exit((index << 16) | line);
+    private void mouseActivated(MouseEvent e) {
+        showCursor(e);
+        hideCursorTimer.restart();
+    }
+
+    private void showCursor(MouseEvent e) {
+        setCursor(null);
+    }
+
+    private void hideCursor(ActionEvent e) {
+        setCursor(transparentCursor);
+    }
+
+    public void clear() {
+        Graphics g = getGraphics();
+        g.clearRect(0, 0, getWidth(), getHeight());
+        g.dispose();
+    }
+
+    public void messageBox(String message, int messageType) {
+        JOptionPane.showMessageDialog(frame, message, title, messageType);
+    }
+
+    public boolean stop() {
+        return stop.compareAndSet(false, true);
+    }
+
+    public boolean reset() {
+        return reset.compareAndSet(false, true);
+    }
+
+    public boolean pollStop() {
+        return stop.compareAndSet(true, false);
+    }
+
+    public boolean pollReset() {
+        return reset.compareAndSet(true, false);
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        activeLock.lock();
+        try {
+            this.active = active;
+            if (active)
+                activated.signalAll();
+        } finally {
+            activeLock.unlock();
+        }
+    }
+
+    public void awaitActive() throws InterruptedException {
+        activeLock.lock();
+        try {
+            while (!active)
+                activated.await();
+        } finally {
+            activeLock.unlock();
+        }
+    }
+
+    @Override
+    public boolean isPressed(int keyCode) {
+        return pressed.contains(keyCode);
+    }
+
+    public KeyboardState getKeyboardState() {
+        return new KeyboardState.Snapshot(pressed);
+    }
+
+    // this is called after the game window has opened
+    @Override
+    public Integer call() throws Exception {
+        return scriptEngine.runScripts();
     }
 }

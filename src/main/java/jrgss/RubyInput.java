@@ -4,7 +4,6 @@ import java.awt.event.KeyEvent;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Predicate;
 
 import org.jruby.Ruby;
@@ -49,13 +48,13 @@ public class RubyInput {
         pressCount = 0;
     }
 
-    public void updateInput(Set<Integer> keyboardState) {
+    public void updateInput(KeyboardState keyboardState) {
         pressCount = isPressed(keyboardState) ? pressCount + 1 : 0;
     }
 
-    private boolean isPressed(Set<Integer> keyboardState) {
+    private boolean isPressed(KeyboardState keyboardState) {
         for (int keyCode : keyCodes)
-            if (keyboardState.contains(keyCode))
+            if (keyboardState.isPressed(keyCode))
                 return true;
         return false;
     }
@@ -139,7 +138,8 @@ public class RubyInput {
 
     @JRubyMethod(meta = true)
     public static void update(IRubyObject recv) {
-        Set<Integer> keyboardState = Game.window.getKeyboardState();
+        Game game = RubySupport.getGame(recv.getRuntime());
+        KeyboardState keyboardState = game.getKeyboardState();
         for (RubyInput input : inputs.values())
             input.updateInput(keyboardState);
     }

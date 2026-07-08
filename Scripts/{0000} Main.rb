@@ -13,8 +13,11 @@ loop do
         if Input.press?(:SHIFT)
             raise 'oops!'
         else
-            Graphics.resize_screen(640, 480)
+            if Graphics.width == 640
+                Graphics.resize_screen(544, 416)
+            else
+                Graphics.resize_screen(640, 480)
+            end
         end
     end
-    sleep(rand/60)
 end

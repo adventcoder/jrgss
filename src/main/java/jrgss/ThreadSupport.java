@@ -23,7 +23,7 @@ public class ThreadSupport {
             Thread.currentThread().interrupt();
     }
 
-    public static void sleep(long timeNanos) throws InterruptedException {
+    public static void sleepNanos(long timeNanos) throws InterruptedException {
         Thread.sleep(timeNanos / 1000_000L, (int) (timeNanos % 1000_000L));
     }
 }
