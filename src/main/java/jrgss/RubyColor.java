@@ -1,7 +1,9 @@
 package jrgss;
 
 import java.awt.Color;
-import java.nio.ByteBuffer;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
@@ -180,24 +182,19 @@ public class RubyColor extends RubyData {
     }
 
     @Override
-    public int dataSize() {
-        return Double.BYTES*4;
+    public void writeData(DataOutputStream out) throws IOException {
+        out.writeDouble(red);
+        out.writeDouble(green);
+        out.writeDouble(blue);
+        out.writeDouble(alpha);
     }
 
     @Override
-    public void dump(ByteBuffer buf) {
-        buf.putDouble(red);
-        buf.putDouble(green);
-        buf.putDouble(blue);
-        buf.putDouble(alpha);
-    }
-
-    @Override
-    public void load(ByteBuffer buf) {
-        red = clamp(buf.getDouble());
-        green = clamp(buf.getDouble());
-        blue = clamp(buf.getDouble());
-        alpha = clamp(buf.getDouble());
+    public void readData(DataInputStream in) throws IOException {
+        red = clamp(in.readDouble());
+        green = clamp(in.readDouble());
+        blue = clamp(in.readDouble());
+        alpha = clamp(in.readDouble());
     }
 
     private static double clamp(double x) {

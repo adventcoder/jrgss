@@ -1,7 +1,9 @@
 package jrgss;
 
 import java.awt.Rectangle;
-import java.nio.ByteBuffer;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
@@ -159,23 +161,18 @@ public class RubyRect extends RubyData {
     }
 
     @Override
-    public int dataSize() {
-        return Integer.BYTES*4;
+    public void writeData(DataOutputStream out) throws IOException {
+        out.writeInt(x);
+        out.writeInt(y);
+        out.writeInt(width);
+        out.writeInt(height);
     }
 
     @Override
-    public void dump(ByteBuffer buf) {
-        buf.putInt(x);
-        buf.putInt(y);
-        buf.putInt(width);
-        buf.putInt(height);
-    }
-
-    @Override
-    public void load(ByteBuffer buf) {
-        x = buf.getInt();
-        y = buf.getInt();
-        width = buf.getInt();
-        height = buf.getInt();
+    public void readData(DataInputStream in) throws IOException {
+        x = in.readInt();
+        y = in.readInt();
+        width = in.readInt();
+        height = in.readInt();
     }
 }
