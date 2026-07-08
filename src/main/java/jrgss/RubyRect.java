@@ -1,8 +1,8 @@
 package jrgss;
 
 import java.awt.Rectangle;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.jruby.Ruby;
@@ -20,6 +20,7 @@ public class RubyRect extends RubyData {
     public static void createRectClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Rect", runtime.getObject(), RubyRect::new);
         RubySupport.rectClass = cls;
+        cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyRect.class);
     }
 
@@ -161,7 +162,7 @@ public class RubyRect extends RubyData {
     }
 
     @Override
-    public void writeData(DataOutputStream out) throws IOException {
+    public void writeData(DataOutput out) throws IOException {
         out.writeInt(x);
         out.writeInt(y);
         out.writeInt(width);
@@ -169,7 +170,7 @@ public class RubyRect extends RubyData {
     }
 
     @Override
-    public void readData(DataInputStream in) throws IOException {
+    public void readData(DataInput in) throws IOException {
         x = in.readInt();
         y = in.readInt();
         width = in.readInt();

@@ -80,7 +80,7 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
     }
 
     public final String title;
-    private final ScriptEngine scriptEngine;
+    private final ParsedArgs args;
 
     public GameFrame frame = null;
 
@@ -100,15 +100,12 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
 
     public Game(String title, ParsedArgs args) {
         this.title = title;
+        this.args = args;
 
         setPreferredSize(new Dimension(544, 416));
         setBackground(Color.BLACK);
         setIgnoreRepaint(true);
         enableEvents(AWTEvent.KEY_EVENT_MASK | AWTEvent.FOCUS_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
-
-        scriptEngine = new ScriptEngine(this);
-        scriptEngine.setGlobalVariable("$TEST", args.test);
-        scriptEngine.setGlobalVariable("$BTEST", args.btest);
     }
 
     @Override
@@ -232,6 +229,9 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
     // this is called after the game window has opened
     @Override
     public Integer call() throws Exception {
+        ScriptEngine scriptEngine = new ScriptEngine(this);
+        scriptEngine.setGlobalVariable("$TEST", args.test || args.btest);
+        scriptEngine.setGlobalVariable("$BTEST", args.btest);
         return scriptEngine.runScripts();
     }
 }

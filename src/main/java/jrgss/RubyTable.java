@@ -1,9 +1,8 @@
 package jrgss;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -19,6 +18,7 @@ public class RubyTable extends RubyData {
     public static RubyClass createTableClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Table", runtime.getObject(), RubyTable::new);
         RubySupport.tableClass = cls;
+        cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyTable.class);
         return cls;
     }
@@ -184,7 +184,7 @@ public class RubyTable extends RubyData {
     }
 
     @Override
-    public void writeData(DataOutputStream out) throws IOException {
+    public void writeData(DataOutput out) throws IOException {
         out.writeInt(arity);
         out.writeInt(xsize);
         out.writeInt(ysize);
@@ -195,7 +195,7 @@ public class RubyTable extends RubyData {
     }
 
     @Override
-    public void readData(DataInputStream in) throws IOException {
+    public void readData(DataInput in) throws IOException {
         //TODO: sanity checking
         arity = in.readInt();
         xsize = in.readInt();

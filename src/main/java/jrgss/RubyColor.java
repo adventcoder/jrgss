@@ -1,8 +1,8 @@
 package jrgss;
 
 import java.awt.Color;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.jruby.Ruby;
@@ -20,6 +20,7 @@ public class RubyColor extends RubyData {
     public static void createColorClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Color", runtime.getObject(), RubyColor::new);
         RubySupport.colorClass = cls;
+        cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyColor.class);
     }
 
@@ -182,7 +183,7 @@ public class RubyColor extends RubyData {
     }
 
     @Override
-    public void writeData(DataOutputStream out) throws IOException {
+    public void writeData(DataOutput out) throws IOException {
         out.writeDouble(red);
         out.writeDouble(green);
         out.writeDouble(blue);
@@ -190,7 +191,7 @@ public class RubyColor extends RubyData {
     }
 
     @Override
-    public void readData(DataInputStream in) throws IOException {
+    public void readData(DataInput in) throws IOException {
         red = clamp(in.readDouble());
         green = clamp(in.readDouble());
         blue = clamp(in.readDouble());

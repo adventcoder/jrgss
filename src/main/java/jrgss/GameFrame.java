@@ -44,7 +44,7 @@ public class GameFrame extends Frame {
                         // the game ended, so we just dispose ourselves gracefully, arigatou gozaimasu
                         EventQueue.invokeLater(() -> dispose());
                     }
-                }, "game");
+                }, "game-main");
                 gameThread.setDaemon(true);
                 gameThread.start();
             }

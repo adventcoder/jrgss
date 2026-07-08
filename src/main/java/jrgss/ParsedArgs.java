@@ -11,7 +11,6 @@ public class ParsedArgs {
                 test = true;
             } else if (arg.equalsIgnoreCase("btest")) {
                 test = true;
-                btest = true;
             } else if (arg.equalsIgnoreCase("console")) {
                 console = true;
             }
