@@ -16,7 +16,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class RubyGraphics {
     public static void createGraphicsModule(Ruby runtime) {
         RubyModule mod = runtime.defineModule("Graphics");
-        RubySupport.graphicsModule = mod;
+        RubySupport.Graphics = mod;
         mod.defineAnnotatedMethods(RubyGraphics.class);
     }
 
@@ -89,7 +89,7 @@ public class RubyGraphics {
     public static IRubyObject snap_to_bitmap(IRubyObject recv) {
         Game game = RubySupport.getGame(recv.getRuntime());
 
-        RubyBitmap bmp = new RubyBitmap(recv.getRuntime(), RubySupport.bitmapClass);
+        RubyBitmap bmp = new RubyBitmap(recv.getRuntime(), RubySupport.Bitmap);
         bmp.initialize(recv.getRuntime().newFixnum(game.getWidth()), recv.getRuntime().newFixnum(game.getHeight()));
 
         Graphics2D g = bmp.getGraphics();
@@ -105,6 +105,7 @@ public class RubyGraphics {
         frameStartTime = System.nanoTime();
     }
 
+    //TODO: handle interrupts?
     @JRubyMethod(meta = true)
     public static void update(IRubyObject recv) throws InterruptedException {
         Game game = RubySupport.getGame(recv.getRuntime());

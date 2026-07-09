@@ -17,9 +17,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 
-import javax.imageio.IIOException;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageTypeSpecifier;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.spi.ImageWriterSpi;
@@ -27,6 +27,7 @@ import javax.imageio.stream.ImageOutputStream;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyHash;
 import org.jruby.RubyNumeric;
 import org.jruby.RubyObject;
 import org.jruby.anno.JRubyMethod;
@@ -38,6 +39,7 @@ import org.jruby.util.JRubyFile;
 public class RubyBitmap extends RubyObject {
     public static RubyClass createBitmapClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Bitmap", runtime.getObject(), RubyBitmap::new);
+        RubySupport.Bitmap = cls;
         cls.defineAnnotatedMethods(RubyBitmap.class);
         return cls;
     }
@@ -48,7 +50,7 @@ public class RubyBitmap extends RubyObject {
 
     public RubyBitmap(Ruby runtime, RubyClass metaClass) {
         super(runtime, metaClass);
-        font = new RubyFont(runtime, RubySupport.fontClass);
+        font = new RubyFont(runtime, RubySupport.Font);
     }
 
     @JRubyMethod
@@ -93,12 +95,13 @@ public class RubyBitmap extends RubyObject {
             flushGraphics();
             font.initialize_copy(other.font);
         } else {
-            throw getRuntime().newTypeError(orig, RubySupport.bitmapClass);
+            throw getRuntime().newTypeError(orig, RubySupport.Bitmap);
         }
         return this;
     }
 
     private BufferedImage copyImage() {
+        checkDisposed();
         return new BufferedImage(image.getColorModel(), image.copyData(null), image.isAlphaPremultiplied(), null);
     }
 
@@ -124,13 +127,13 @@ public class RubyBitmap extends RubyObject {
     }
 
     public Graphics2D getGraphics() {
-        checkDisposed();
         if (graphics == null)
             createGraphics();
         return graphics;
     }
 
     private void createGraphics() {
+        checkDisposed();
         graphics = image.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -446,54 +449,52 @@ public class RubyBitmap extends RubyObject {
         RasterOps.radialBlur(tempRaster, image.getRaster(), amplitude, divisions);
     }
 
-    @JRubyMethod
-    public void save(IRubyObject arg) {
-        //NOTE: we could support a background color option for bmp and jpg.
-        String path = arg.asJavaString();
+    @JRubyMethod(required = 1, optional = 2)
+    public void save(IRubyObject... args) {
+        checkDisposed();
+        String path = args[0].asJavaString();
+        String format = args.length >= 2 ? args[1].asJavaString() : null;
+        RubyHash opt = args.length >= 3 ? args[2].convertToHash() : null;
+
         JRubyFile file = new JRubyFile(getRuntime().getCurrentDirectory(), path);
+        ImageWriter writer = getImageWriter(ImageTypeSpecifier.createFromRenderedImage(image), file, format);
 
-        String suffix = FileSupport.getSuffix(file);
-        if (suffix == null)
-            throw getRuntime().newArgumentError("missing file extension: " + path);
-
-        try {
-            if (!writeBySuffix(file, suffix))
-                throw new IOException("unsupported file extension: " + suffix);
-        } catch (IOException ioe) {
-            throw RubySupport.newRGSSError(getRuntime(), "failed saving bitmap: " + ioe.getMessage());
+        ImageWriteParam param = writer.getDefaultWriteParam();
+        if (opt != null) {
+            // parse options here...
         }
-    }
 
-    private boolean writeBySuffix(Object output, String suffix) throws IOException {
-        ImageWriter writer = getWriterBySuffix(suffix);
-        if (writer == null)
-            return false;
-
-        try (ImageOutputStream ios = ImageIO.createImageOutputStream(output)) {
-            if (ios == null)
-                throw new IIOException("Can't create ImageOutputStream!");
-
-            ImageWriteParam param = writer.getDefaultWriteParam();
-            //NOTE: we could parse a ruby opts hash into params here, e.g. quality
-
+        try (ImageOutputStream ios = ImageIO.createImageOutputStream(file)) {
             writer.setOutput(ios);
-            writer.write(null, new IIOImage(image, null, null), param);
-            ios.flush();
-        } finally {
-            writer.dispose();
+            try {
+                writer.write(null, new IIOImage(image, null, null), param);
+                ios.flush();
+            } finally {
+                writer.dispose();
+            }
+        } catch (IOException ioe) {
+            throw getRuntime().newIOErrorFromException(ioe);
         }
-
-        return true;
     }
 
-    private ImageWriter getWriterBySuffix(String suffix) {
-        Iterator<ImageWriter> it = ImageIO.getImageWritersBySuffix(suffix);
-        while (it.hasNext()) {
-            ImageWriter writer = it.next();
-            ImageWriterSpi provider = writer.getOriginatingProvider();
-            if (provider.canEncodeImage(image))
-                return writer;
+    private ImageWriter getImageWriter(ImageTypeSpecifier imageType, File file, String format) {
+        if (format != null) {
+            Iterator<ImageWriter> it = ImageIO.getImageWriters(imageType, format);
+            if (it.hasNext()) return it.next();
+            throw getRuntime().newArgumentError("unsupported file format: " + format);
+        } else {
+            String suffix = FileSupport.getSuffix(file);
+            if (suffix == null)
+                throw getRuntime().newArgumentError("no file extension and format not given");
+
+            Iterator<ImageWriter> it = ImageIO.getImageWritersBySuffix(suffix);
+            while (it.hasNext()) {
+                ImageWriter writer = it.next();
+                ImageWriterSpi provider = writer.getOriginatingProvider();
+                if (provider.canEncodeImage(imageType))
+                    return writer;
+            }
+            throw getRuntime().newArgumentError("unsupported file extension: " + suffix);
         }
-        return null;
     }
 }

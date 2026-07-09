@@ -20,7 +20,7 @@ import it.unimi.dsi.fastutil.ints.IntList;
 public class RubyInput {
     public static void createInputModule(Ruby runtime) {
         RubyModule mod = runtime.defineModule("Input");
-        RubySupport.inputModule = mod;
+        RubySupport.Input = mod;
         mod.defineAnnotatedMethods(RubyInput.class);
 
         for (RubyInput input : inputs.values())

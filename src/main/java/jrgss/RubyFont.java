@@ -18,13 +18,13 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class RubyFont extends RubyObject {
     public static void createFontClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Font", runtime.getObject(), RubyFont::new);
-        RubySupport.fontClass = cls;
+        RubySupport.Font = cls;
         cls.defineAnnotatedMethods(RubyFont.class);
         cls.setInternalModuleVariable("defaultFont", createDefaultFont(runtime));
     }
 
     private static RubyFont createDefaultFont(Ruby runtime) {
-        RubyFont font = new RubyFont(runtime, RubySupport.fontClass, false);
+        RubyFont font = new RubyFont(runtime, RubySupport.Font, false);
         font.name = runtime.newString(Font.SANS_SERIF);
         font.size = 24;
         font.bold = false;
@@ -150,7 +150,7 @@ public class RubyFont extends RubyObject {
         if (obj instanceof RubyFont font) {
             set(font);
         } else {
-            throw getRuntime().newTypeError(obj, RubySupport.fontClass);
+            throw getRuntime().newTypeError(obj, RubySupport.Font);
         }
         return this;
     }

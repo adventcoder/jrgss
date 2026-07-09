@@ -20,7 +20,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class RubyAudio {
     public static void createAudioModule(Ruby runtime) {
         RubyModule mod = runtime.defineModule("Audio");
-        RubySupport.audioModule = mod;
+        RubySupport.Audio = mod;
         mod.defineAnnotatedMethods(RubyAudio.class);
     }
 

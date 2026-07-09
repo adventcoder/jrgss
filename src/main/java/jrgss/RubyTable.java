@@ -17,7 +17,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class RubyTable extends RubyData {
     public static RubyClass createTableClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Table", runtime.getObject(), RubyTable::new);
-        RubySupport.tableClass = cls;
+        RubySupport.Table = cls;
         cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyTable.class);
         return cls;
@@ -57,7 +57,7 @@ public class RubyTable extends RubyData {
             this.zsize = table.zsize;
             this.data = table.data.clone();
         } else {
-            throw getRuntime().newTypeError(obj, RubySupport.tableClass);
+            throw getRuntime().newTypeError(obj, RubySupport.Table);
         }
         return this;
     }

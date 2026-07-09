@@ -19,7 +19,7 @@ import lombok.EqualsAndHashCode;
 public class RubyRect extends RubyData {
     public static void createRectClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Rect", runtime.getObject(), RubyRect::new);
-        RubySupport.rectClass = cls;
+        RubySupport.Rect = cls;
         cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyRect.class);
     }
@@ -38,7 +38,7 @@ public class RubyRect extends RubyData {
     }
 
     public RubyRect(Ruby runtime, boolean useObjectSpace) {
-        super(runtime, RubySupport.rectClass, useObjectSpace);
+        super(runtime, RubySupport.Rect, useObjectSpace);
     }
 
     public static RubyRect newRect(Ruby runtime, int x, int y, int width, int height) {
@@ -119,7 +119,7 @@ public class RubyRect extends RubyData {
             this.width = rect.width;
             this.height = rect.height;
         } else {
-            throw obj.getRuntime().newTypeError(obj, RubySupport.rectClass);
+            throw obj.getRuntime().newTypeError(obj, RubySupport.Rect);
         }
         return this;
     }

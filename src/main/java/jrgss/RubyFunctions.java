@@ -1,75 +1,138 @@
 package jrgss;
 
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 
 import javax.swing.JOptionPane;
 
 import org.jruby.Ruby;
+import org.jruby.RubyBasicObject;
+import org.jruby.RubyLocalJumpError;
 import org.jruby.anno.JRubyMethod;
+import org.jruby.exceptions.JumpException;
+import org.jruby.exceptions.RaiseException;
+import org.jruby.runtime.Block;
+import org.jruby.runtime.BlockCallback;
+import org.jruby.runtime.CallBlock;
+import org.jruby.runtime.Signature;
+import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
 import org.jruby.util.JRubyFile;
 
 public class RubyFunctions {
-    @JRubyMethod
-    public static void rgss_main(IRubyObject recv) {
-        //TODO
+    @JRubyMethod(visibility = Visibility.PRIVATE)
+    public static void rgss_main(IRubyObject self, Block block) {
+        callLoop(self, (context, args, innerBlock) -> {
+            try {
+                block.call(context);
+            } catch (RaiseException ex) {
+                if (RubySupport.RGSSReset.isInstance(ex.getException())) {
+                    // TODO: reset handling goes here!
+                    return context.nil; // continue loop
+                } else {
+                    throw ex;
+                }
+            }
+
+            throw new JumpException.FlowControlException(RubyLocalJumpError.Reason.BREAK, context.getCurrentTarget(), context.nil);
+        });
     }
 
-    @JRubyMethod
-    public static void rgss_stop(IRubyObject recv) {
-        //TODO
+    @JRubyMethod(visibility = Visibility.PRIVATE)
+    public static void rgss_stop(IRubyObject self) {
+        callLoop(self, (context, args, block) -> {
+            RubySupport.Graphics.callMethod("update");
+            return context.nil;
+        });
     }
 
-    @JRubyMethod
-    public static IRubyObject load_data(IRubyObject recv, IRubyObject arg) {
-        Ruby runtime = recv.getRuntime();
-        JRubyFile file = new JRubyFile(runtime.getCurrentDirectory(), arg.asJavaString());
-        try (FileInputStream in = new FileInputStream(file)) {
-            return loadObject(runtime, in, false);
-        } catch (IOException ioe) {
-            throw runtime.newIOErrorFromException(ioe);
+    private static IRubyObject callLoop(IRubyObject self, BlockCallback callback) {
+        ThreadContext context = self.getRuntime().getCurrentContext();
+        Block block = CallBlock.newCallClosure(self, self.getRuntime().getKernel(), Signature.OPTIONAL, callback, context);
+        return self.callMethod(context, "loop", new IRubyObject[0], block);
+    }
+
+    @JRubyMethod(visibility = Visibility.PRIVATE)
+    public static IRubyObject load_data(IRubyObject self, IRubyObject fileArg) {
+        JRubyFile file = new JRubyFile(self.getRuntime().getCurrentDirectory(), fileArg.asJavaString());
+        try {
+            return loadData(self.getRuntime(), file);
+        } catch (FileNotFoundException ex) {
+            throw self.getRuntime().newErrnoENOENTError(fileArg.asJavaString());
+        } catch (IOException ex) {
+            throw self.getRuntime().newIOErrorFromException(ex);
         }
     }
 
-    private static IRubyObject loadObject(Ruby runtime, InputStream in, boolean taint) throws IOException {
-        try (UnmarshalStream stream = new UnmarshalStream(runtime, in, runtime.getNil(), taint)) {
+    public static IRubyObject loadData(Ruby runtime, File file) throws IOException {
+        try (InputStream in = new FileInputStream(file)) {
+            @SuppressWarnings("resource")
+            UnmarshalStream stream = new UnmarshalStream(runtime, in, runtime.getNil(), true);
             return stream.unmarshalObject();
         }
     }
 
-    @JRubyMethod
-    public static void save_data(IRubyObject recv, IRubyObject obj, IRubyObject arg) {
-        Ruby runtime = recv.getRuntime();
-        JRubyFile file = new JRubyFile(runtime.getCurrentDirectory(), arg.asJavaString());
+    @JRubyMethod(visibility = Visibility.PRIVATE)
+    public static void save_data(IRubyObject self, IRubyObject obj, IRubyObject fileArg) {
+        JRubyFile file = new JRubyFile(self.getRuntime().getCurrentDirectory(), fileArg.asJavaString());
+        try {
+            saveData(self.getRuntime(), file, obj);
+        } catch (FileNotFoundException ex) {
+            throw self.getRuntime().newErrnoENOENTError(fileArg.asJavaString());
+        } catch (IOException ex) {
+            throw self.getRuntime().newIOErrorFromException(ex);
+        }
+    }
+
+    public static void saveData(Ruby runtime, File file, IRubyObject obj) throws IOException {
         try (FileOutputStream out = new FileOutputStream(file)) {
-            dumpObject(out, obj, -1);
-        } catch (IOException ioe) {
-            throw runtime.newIOErrorFromException(ioe);
-        }
-    }
-
-    private static boolean dumpObject(OutputStream out, IRubyObject obj, int depthLimit) throws IOException {
-        try (MarshalStream stream = new MarshalStream(obj.getRuntime(), out, depthLimit)) {
+            @SuppressWarnings("resource")
+            MarshalStream stream = new MarshalStream(runtime, out, -1);
             stream.dumpObject(obj);
-            return stream.isTainted();
         }
     }
 
-    @JRubyMethod(rest = true)
-    public static void msgbox(IRubyObject recv, IRubyObject... args) {
-        Game game = RubySupport.getGame(recv.getRuntime());
-        game.showMessageDialog("TODO: msgbox", JOptionPane.PLAIN_MESSAGE);
+    @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
+    public static void msgbox(ThreadContext context, IRubyObject self, IRubyObject... args) {
+        //NOTE: we could call RubyIO.print() but would need a StringIO to write to
+        IRubyObject RS = context.getRuntime().getGlobalVariables().get("$\\");
+        IRubyObject FS = context.getRuntime().getGlobalVariables().get("$,");
+
+        StringBuilder msg = new StringBuilder();
+        if (args.length == 0) {
+            msg.append(context.getLastLine().asString());
+        } else {
+            for (int i = 0; i < args.length; i++) {
+                if (i > 0 && !FS.isNil())
+                    msg.append(FS.asString());
+                msg.append(args[i].asString());
+            }
+        }
+        if (!RS.isNil())
+            msg.append(RS.asString());
+
+        Game game = RubySupport.getGame(context.getRuntime());
+        game.showMessageDialog(msg, JOptionPane.PLAIN_MESSAGE);
     }
 
-    @JRubyMethod(rest = true)
-    public static void msgbox_p(IRubyObject recv, IRubyObject... args) {
-        Game game = RubySupport.getGame(recv.getRuntime());
-        game.showMessageDialog("TODO: msgbox_p", JOptionPane.PLAIN_MESSAGE);
+    @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
+    public static void msgbox_p(ThreadContext context, IRubyObject self, IRubyObject... args) {
+        IRubyObject defaultRS = context.getRuntime().getGlobalVariables().getDefaultSeparator();
+
+        StringBuilder msg = new StringBuilder();
+        for (IRubyObject arg : args) {
+            msg.append(RubyBasicObject.rbInspect(context, arg).asString());
+            msg.append(defaultRS.asString());
+        }
+
+        Game game = RubySupport.getGame(self.getRuntime());
+        game.showMessageDialog(msg, JOptionPane.PLAIN_MESSAGE);
     }
 }

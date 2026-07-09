@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 
 import javax.swing.JOptionPane;
@@ -34,6 +35,9 @@ import org.ini4j.Ini;
 import com.google.common.base.MoreObjects;
 
 public class Game extends Canvas implements KeyboardState {
+    //TODO: replace stderr printing with logger
+    public static final Logger logger = Logger.getLogger(Game.class.getName());
+
     public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
@@ -48,6 +52,10 @@ public class Game extends Canvas implements KeyboardState {
 
         game.requestFocus();
         game.createBufferStrategy(2);
+
+        //TODO: we should wait for the window to be fully opened here...
+        // some visible problems like error message box flashing otherwise
+        Thread.sleep(100);
 
         try {
             setupRTP(ini, game);
@@ -77,14 +85,14 @@ public class Game extends Canvas implements KeyboardState {
         return ini;
     }
 
-    private static void setupRTP(Ini ini, Game game) {
+    private static void setupRTP(Ini ini, Game game) throws Exception {
         String rtpName = ini.get("Game", "RTP");
         if (rtpName == null || rtpName.isEmpty()) return;
 
-        Preferences rtpNode = Preferences.systemRoot().node("com/example/jrgss/rtp");
+        Preferences rtpNode = Preferences.systemRoot().node("jrgss/rtp");
         String rtpPath = rtpNode.get(rtpName, null);
         if (rtpPath == null) {
-            game.showMessageDialog("RTP not found: " + rtpName, JOptionPane.ERROR_MESSAGE);
+            game.showMessageDialog(rtpName + " RTP is required to run this game.", JOptionPane.ERROR_MESSAGE);
             System.exit(0);
         }
 
@@ -206,8 +214,14 @@ public class Game extends Canvas implements KeyboardState {
         g.dispose();
     }
 
-    public void showMessageDialog(String message, int messageType) {
-        JOptionPane.showMessageDialog(frame, message, title, messageType);
+    public void showMessageDialog(CharSequence text, int messageType) {
+        //TODO: handle long text
+        // JTextArea textArea = new JTextArea(text.toString(), 0, 50);
+        // textArea.setLineWrap(true);
+        // textArea.setWrapStyleWord(true);
+        // textArea.setEditable(false);
+        // textArea.setSize(textArea.getPreferredSize());
+        JOptionPane.showMessageDialog(frame, text, title, messageType);
     }
 
     public boolean reset() {

@@ -50,7 +50,7 @@ public class ScriptEngine implements AutoCloseable {
             } catch (RaiseException re) {
                 game.clear();
                 RubyException exc = re.getException();
-                if (RubySupport.rgssResetClass.isInstance(exc)) {
+                if (RubySupport.RGSSReset.isInstance(exc)) {
                     Thread.sleep(500);
                     RubyGraphics.reset();
                     RubyInput.reset();
@@ -59,6 +59,10 @@ public class ScriptEngine implements AutoCloseable {
                     if (status != null && !status.isNil())
                         exitStatus = RubyNumeric.fix2int(status);
                     break;
+                } else if (runtime.getErrno().getClass("ENOENT").isInstance(exc)) {
+                    String path = exc.getMessageAsJavaString().replaceFirst("^No such file or directory - ", "");
+                    game.showMessageDialog("Unable to find file:\n\n" + path, JOptionPane.WARNING_MESSAGE);
+                    System.exit(0);
                 } else {
                     rubyError(exc);
                 }

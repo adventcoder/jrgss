@@ -1,5 +1,7 @@
 package jrgss;
 
+import java.io.FileNotFoundException;
+
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
@@ -13,19 +15,19 @@ import lombok.experimental.UtilityClass;
 public class RubySupport {
     public static Game game;
 
-    public static RubyClass rgssErrorClass;
-    public static RubyClass rgssResetClass;
+    public static RubyClass RGSSError;
+    public static RubyClass RGSSReset;
 
-    public static RubyClass rectClass;
-    public static RubyClass colorClass;
-    public static RubyClass tableClass;
+    public static RubyClass Rect;
+    public static RubyClass Color;
+    public static RubyClass Table;
 
-    public static RubyClass bitmapClass;
-    public static RubyClass fontClass;
+    public static RubyClass Bitmap;
+    public static RubyClass Font;
 
-    public static RubyModule graphicsModule;
-    public static RubyModule inputModule;
-    public static RubyModule audioModule;
+    public static RubyModule Graphics;
+    public static RubyModule Input;
+    public static RubyModule Audio;
 
     public static Game getGame(Ruby runtime) {
         //TODO: store this per runtime...?
@@ -33,8 +35,8 @@ public class RubySupport {
     }
 
     public static void bootstrap(Ruby runtime) {
-        rgssResetClass = defineSubclass("RGSSReset", runtime.getException());
-        rgssErrorClass = defineSubclass("RGSSError", runtime.getStandardError());
+        RGSSReset = defineSubclass("RGSSReset", runtime.getException());
+        RGSSError = defineSubclass("RGSSError", runtime.getStandardError());
 
         RubyRect.createRectClass(runtime);
         RubyColor.createColorClass(runtime);
@@ -67,35 +69,39 @@ public class RubySupport {
 
     public static RubyRect asRect(IRubyObject obj) {
         if (obj instanceof RubyRect) return (RubyRect) obj;
-        throw newTypeConversionError(obj, rectClass);
+        throw newTypeConversionError(obj, Rect);
     }
 
     public static RubyColor asColor(IRubyObject obj) {
         if (obj instanceof RubyColor) return (RubyColor) obj;
-        throw newTypeConversionError(obj, colorClass);
+        throw newTypeConversionError(obj, Color);
     }
 
     public static RubyBitmap asBitmap(IRubyObject obj) {
         if (obj instanceof RubyBitmap) return (RubyBitmap) obj;
-        throw newTypeConversionError(obj, bitmapClass);
+        throw newTypeConversionError(obj, Bitmap);
     }
 
     public static RubyFont asFont(IRubyObject obj) {
         if (obj instanceof RubyFont) return (RubyFont) obj;
-        throw newTypeConversionError(obj, fontClass);
+        throw newTypeConversionError(obj, Font);
     }
 
     // Errors
 
     public static RaiseException newRGSSReset(Ruby runtime) {
-        return runtime.newRaiseException(rgssResetClass, "");
+        return runtime.newRaiseException(RGSSReset, "");
     }
 
     public static RaiseException newRGSSError(Ruby runtime, String message) {
-        return runtime.newRaiseException(rgssErrorClass, message);
+        return runtime.newRaiseException(RGSSError, message);
     }
 
     public static RaiseException newTypeConversionError(IRubyObject obj, RubyClass target) {
         return obj.getRuntime().newTypeError("can't convert " + obj.getMetaClass().getRealClass().getName() + " into " + target.getName());
+    }
+
+    public static RaiseException newFileNotFoundError(Ruby runtime, FileNotFoundException ex) {
+        return runtime.newErrnoENOENTError(ex.getMessage().replaceFirst(" \\([^)]*\\)$", ""));
     }
 }

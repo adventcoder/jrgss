@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 
-import javax.swing.JOptionPane;
-
 import org.jruby.Ruby;
 
 import lombok.experimental.UtilityClass;
@@ -40,11 +38,8 @@ public class RTP {
 
     public static File findFile(Ruby runtime, String path) {
         File file = findFile(runtime.getCurrentDirectory(), path);
-        if (file == null) {
-            Game game = RubySupport.getGame(runtime);
-            game.showMessageDialog("Unable to find file: " + path, JOptionPane.WARNING_MESSAGE);
-            System.exit(0);
-        }
+        if (file == null)
+            throw runtime.newErrnoENOENTError(path);
         return file;
     }
 

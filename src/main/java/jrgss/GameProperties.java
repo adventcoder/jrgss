@@ -5,6 +5,11 @@ import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
 public class GameProperties {
+    public static final String LAUNCH_IN_FULLSCREEN_KEY = "LaunchInFullscreen";
+    public static final String PLAY_MUSIC_KEY = "PlayMusic";
+    public static final String PLAY_SOUND_KEY = "PlaySound";
+    public static final String BUTTON_ASSIGN_KEY = "ButtonAssign";
+
     public static final int[] keyCodes = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         KeyEvent.VK_SPACE, KeyEvent.VK_ENTER, KeyEvent.VK_ESCAPE, KeyEvent.VK_NUMPAD0, KeyEvent.VK_SHIFT,
@@ -27,19 +32,19 @@ public class GameProperties {
     public byte[] buttonAssign = defaultButtonAssign;
 
     public void load() {
-        Preferences node = Preferences.userRoot().node("com/example/jrgss");
-        launchInFullscreen = node.getBoolean("launchInFullscreen", launchInFullscreen);
-        playMusic = node.getBoolean("playMusic", playMusic);
-        playSound = node.getBoolean("playSound", playSound);
-        buttonAssign = node.getByteArray("buttonAssign", buttonAssign);
+        Preferences node = Preferences.userRoot().node("jrgss");
+        launchInFullscreen = node.getBoolean(LAUNCH_IN_FULLSCREEN_KEY, launchInFullscreen);
+        playMusic = node.getBoolean(PLAY_MUSIC_KEY, playMusic);
+        playSound = node.getBoolean(PLAY_SOUND_KEY, playSound);
+        buttonAssign = node.getByteArray(BUTTON_ASSIGN_KEY, buttonAssign);
     }
 
     public void store() throws BackingStoreException {
-        Preferences node = Preferences.userRoot().node("com/example/jrgss");
-        node.putBoolean("launchInFullscreen", launchInFullscreen);
-        node.putBoolean("playMusic", launchInFullscreen);
-        node.putBoolean("playsound", launchInFullscreen);
-        node.putByteArray("buttonAssign", buttonAssign);
+        Preferences node = Preferences.userRoot().node("jrgss");
+        node.putBoolean(LAUNCH_IN_FULLSCREEN_KEY, launchInFullscreen);
+        node.putBoolean(PLAY_MUSIC_KEY, launchInFullscreen);
+        node.putBoolean(PLAY_SOUND_KEY, launchInFullscreen);
+        node.putByteArray(BUTTON_ASSIGN_KEY, buttonAssign);
         node.flush();
     }
 
