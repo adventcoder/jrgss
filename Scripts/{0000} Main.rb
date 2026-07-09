@@ -9,7 +9,9 @@ loop do
     print("\r")
     print(s)
     len = s.size
-    if Input.trigger?(:C)
+    if Input.trigger?(:B)
+        msgbox("hoy")
+    elsif Input.trigger?(:C)
         if Input.press?(:SHIFT)
             raise 'oops!'
         else

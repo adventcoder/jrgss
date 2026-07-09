@@ -23,7 +23,10 @@ public class RTP {
     public static List<File> listDir(String cwd, String path) {
         List<File> files = new ArrayList<>();
         for (String rootPath : PATH) {
-            File root = new File(cwd, rootPath);
+            File root = new File(rootPath);
+            if (!root.isAbsolute())
+                root = new File(cwd, rootPath);
+
             File dir = new File(root, path);
 
             String[] names = dir.list();
@@ -47,24 +50,31 @@ public class RTP {
 
     public static File findFile(String cwd, String path) {
         for (String rootPath : PATH) {
-            File root = new File(cwd, rootPath);
+            File root = new File(rootPath);
+            if (!root.isAbsolute())
+                root = new File(cwd, rootPath);
+
             File file = new File(root, path);
 
             // if the file exists then return it directly
-            if (file.isFile()) return file;
+            if (file.exists() && file.isFile()) return file;
             File parentFile = file.getParentFile();
 
-            String[] siblingNames = (parentFile == null ? new File(".") : parentFile).list();
+            String[] siblingNames = parentFile.list();
             if (siblingNames == null) continue; // the parent doesn't exist either
 
             // otherwise search for a sibling with the same base name
             for (String name : siblingNames) {
                 File siblingFile = new File(parentFile, name);
-                if (siblingFile.isDirectory()) continue;
+                if (!siblingFile.isFile()) continue;
                 if (FileSupport.removeSuffix(siblingFile).equals(file))
                     return siblingFile;
             }
         }
         return null;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(findFile("src/main/java", "jrgss/RTP"));
     }
  }

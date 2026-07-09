@@ -18,13 +18,14 @@ import org.jruby.javasupport.JavaEmbedUtils;
 import org.jruby.runtime.backtrace.RubyStackTraceElement;
 import org.jruby.runtime.builtin.IRubyObject;
 
-public class ScriptEngine {
+public class ScriptEngine implements AutoCloseable {
     private final Game game;
     private final Ruby runtime;
 
     public ScriptEngine(Game game) {
         this.game = game;
         this.runtime = Ruby.newInstance();
+        runtime.getGlobalVariables().defineReadonly("$GAME", new ValueAccessor(null), null);
         RubySupport.game = game;
         RubySupport.bootstrap(runtime);
     }
@@ -34,7 +35,11 @@ public class ScriptEngine {
         runtime.getGlobalVariables().define(name, var, Scope.GLOBAL);
     }
 
-    public Integer runScripts(String scriptsPath) throws IOException, InterruptedException {
+    public void loadScripts(String scriptsPath) {
+        //TODO
+    }
+
+    public Integer runScripts() throws IOException, InterruptedException {
         Integer exitStatus = null;
         while (true) {
             try {
@@ -46,6 +51,7 @@ public class ScriptEngine {
                 game.clear();
                 RubyException exc = re.getException();
                 if (RubySupport.rgssResetClass.isInstance(exc)) {
+                    Thread.sleep(500);
                     RubyGraphics.reset();
                     RubyInput.reset();
                 } else if (runtime.getSystemExit().isInstance(exc)) {
@@ -97,5 +103,11 @@ public class ScriptEngine {
     private String getScriptTitle(int i) {
         if (i == 0) return "Main";
         throw new ArrayIndexOutOfBoundsException(i);
+    }
+
+    @Override
+    public void close() {
+        //TODO: unclear if this is needed
+        runtime.tearDown(false);
     }
 }

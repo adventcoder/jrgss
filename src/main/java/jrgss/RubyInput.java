@@ -85,8 +85,8 @@ public class RubyInput {
         inputs.put(X, new RubyInput("X", new int[0]));
         inputs.put(Y, new RubyInput("Y", new int[0]));
         inputs.put(Z, new RubyInput("Z", new int[0]));
-        inputs.put(L, new RubyInput("L", new int[0]));
-        inputs.put(R, new RubyInput("R", new int[0]));
+        inputs.put(L, new RubyInput("L", new int[] { KeyEvent.VK_PAGE_UP }));
+        inputs.put(R, new RubyInput("R", new int[] { KeyEvent.VK_PAGE_DOWN }));
 
         inputs.put(SHIFT, new RubyInput("SHIFT", new int[] { KeyEvent.VK_SHIFT }));
         inputs.put(CTRL, new RubyInput("CTRL", new int[] { KeyEvent.VK_CONTROL }));
@@ -106,22 +106,18 @@ public class RubyInput {
             inputsByName.put(input.symbol, input);
     }
 
-    public static void assignButtons(byte[] buttonMap) {
-        for (int inp = A; inp <= R; inp++) {
-            IntList keyCodes = new IntArrayList();
-            int limit = 10 + Math.min(buttonMap.length - 10, GameProperties.buttonKeyCodes.length);
+    public static void assignButtons(byte[] buttons, int[] keyCodes) {
+        for (int btn = A; btn <= R; btn++) {
+            IntList buttonKeyCodes = new IntArrayList();
+            int limit = Math.min(buttons.length, keyCodes.length);
             for (int i = 10; i < limit; i++) {
-                if (Byte.toUnsignedInt(buttonMap[i]) == inp)
-                    keyCodes.add(GameProperties.buttonKeyCodes[i - 10]);
+                if (Byte.toUnsignedInt(buttons[i]) == btn)
+                    buttonKeyCodes.add(keyCodes[i]);
             }
-            if (inp == L) keyCodes.add(KeyEvent.VK_PAGE_UP);
-            if (inp == R) keyCodes.add(KeyEvent.VK_PAGE_DOWN);
-            inputs.get(inp).keyCodes = keyCodes.toIntArray();
+            if (btn == L) buttonKeyCodes.add(KeyEvent.VK_PAGE_UP);
+            if (btn == R) buttonKeyCodes.add(KeyEvent.VK_PAGE_DOWN);
+            inputs.get(btn).keyCodes = buttonKeyCodes.toIntArray();
         }
-    }
-
-    static {
-        assignButtons(new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, C, C, B, B, A, C, B, 0, 0, 0, X, Y, Z, L, R });
     }
 
     public static void reset() {

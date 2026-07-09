@@ -25,6 +25,7 @@ public class RubySupport {
 
     public static RubyModule graphicsModule;
     public static RubyModule inputModule;
+    public static RubyModule audioModule;
 
     public static Game getGame(Ruby runtime) {
         //TODO: store this per runtime...?
@@ -44,6 +45,9 @@ public class RubySupport {
 
         RubyGraphics.createGraphicsModule(runtime);
         RubyInput.createInputModule(runtime);
+        RubyAudio.createAudioModule(runtime);
+
+        runtime.getObject().defineAnnotatedMethods(RubyFunctions.class);
     }
 
     private static RubyClass defineSubclass(String name, RubyClass superClass) {

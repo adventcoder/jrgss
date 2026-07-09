@@ -46,23 +46,25 @@ public class Game extends Canvas implements KeyboardState {
         GameFrame frame = new GameFrame(game);
         frame.setVisible(true);
 
+        game.requestFocus();
+        game.createBufferStrategy(2);
+
         try {
             setupRTP(ini, game);
             setupFonts();
 
-            game.createBufferStrategy(2);
-            game.requestFocus();
-
             ScriptEngine scriptEngine = new ScriptEngine(game);
-            scriptEngine.runScripts(scriptsPath);
+            scriptEngine.loadScripts(scriptsPath);
+            scriptEngine.runScripts();
         } finally {
             frame.dispose();
         }
     }
 
     private static Ini loadIni() {
-        //TODO: Get this from the runpatch
-        // System.getProperty("jpackage.app-path");
+        //TODO: Get this from the app path?
+        // File appFile = new File(System.getProperty("jpackage.app-path"));
+        // File iniFile = FileSupport.addSuffix(FileSupport.removeSuffix(appFile), "ini");
         File iniFile = new File("Game.ini");
         Ini ini = new Ini();
         if (iniFile.exists()) {
@@ -103,7 +105,8 @@ public class Game extends Canvas implements KeyboardState {
                 continue;
             }
 
-            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+            if (GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font))
+                System.err.println("Registered font " + font.getName());
         }
     }
 
@@ -119,8 +122,8 @@ public class Game extends Canvas implements KeyboardState {
 
     public final Set<Integer> pressed = ConcurrentHashMap.newKeySet();
 
-    private static final Cursor transparentCursor;
-    static {
+    private final Cursor transparentCursor;
+    {
         BufferedImage transparentImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(0, 0), "transparent");
     }

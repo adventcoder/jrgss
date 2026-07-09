@@ -54,7 +54,8 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
         Game game = RubySupport.getGame(getRuntime());
-        image = game.getGraphicsConfiguration().createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
+        GraphicsConfiguration gc = game.getGraphicsConfiguration();
+        image = gc.createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
         font.initialize(new IRubyObject[0]);
     }
 
