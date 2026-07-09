@@ -34,7 +34,7 @@ public class ScriptEngine {
         runtime.getGlobalVariables().define(name, var, Scope.GLOBAL);
     }
 
-    public Integer runScripts() throws IOException, InterruptedException {
+    public Integer runScripts(String scriptsPath) throws IOException, InterruptedException {
         Integer exitStatus = null;
         while (true) {
             try {
@@ -64,7 +64,7 @@ public class ScriptEngine {
     private void runScript(int i) throws IOException, InterruptedException {
         String file = String.format("{%04d}", i);
         String title = getScriptTitle(i);
-        try (InputStream in = new FileInputStream("Scripts/test.rb")) {
+        try (InputStream in = new FileInputStream("Scripts/" + file + " " + title + ".rb")) {
             String script = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             runtime.executeScript(script, file);
         }
@@ -90,7 +90,7 @@ public class ScriptEngine {
             exitStatus = (scriptIndex << 16) | line;
         }
 
-        game.messageBox(message + "\n\n" + exc.getMessageAsJavaString(), JOptionPane.WARNING_MESSAGE);
+        game.showMessageDialog(message + "\n\n" + exc.getMessageAsJavaString(), JOptionPane.WARNING_MESSAGE);
         System.exit(exitStatus);
     }
 

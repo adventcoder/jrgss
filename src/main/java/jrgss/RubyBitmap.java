@@ -451,11 +451,9 @@ public class RubyBitmap extends RubyObject {
         String path = arg.asJavaString();
         JRubyFile file = new JRubyFile(getRuntime().getCurrentDirectory(), path);
 
-        String name = file.getName();
-        int dotIndex = name.lastIndexOf('.');
-        if (dotIndex <= 0)
+        String suffix = FileSupport.getSuffix(file);
+        if (suffix == null)
             throw getRuntime().newArgumentError("missing file extension: " + path);
-        String suffix = name.substring(dotIndex + 1);
 
         try {
             if (!writeBySuffix(file, suffix))

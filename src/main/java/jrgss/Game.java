@@ -19,68 +19,95 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.prefs.Preferences;
 
 import javax.swing.JOptionPane;
 import javax.swing.Timer;
 import javax.swing.UIManager;
 
-public class Game extends Canvas implements Callable<Integer>, KeyboardState {
-    private static Cursor transparentCursor;
+import org.ini4j.Ini;
 
-    static {
-        BufferedImage transparentImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-        transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(0, 0), "transparent");
-    }
+import com.google.common.base.MoreObjects;
 
+public class Game extends Canvas implements KeyboardState {
     public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
-        // Ini ini = new Ini(new File("Game.ini"));
+        Ini ini = loadIni();
+        String title = MoreObjects.firstNonNull(ini.get("Game", "Title"), "Untitled");
+        String scriptsPath = ini.get("Game", "Scripts");
 
-        //setupRTP(rtpName);
-        setupFonts();
-
-        Game game = new Game("Untitled", new ParsedArgs(args));
+        Game game = new Game(title);
 
         GameFrame frame = new GameFrame(game);
         frame.setVisible(true);
+
+        try {
+            setupRTP(ini, game);
+            setupFonts();
+
+            game.createBufferStrategy(2);
+            game.requestFocus();
+
+            ScriptEngine scriptEngine = new ScriptEngine(game);
+            scriptEngine.runScripts(scriptsPath);
+        } finally {
+            frame.dispose();
+        }
+    }
+
+    private static Ini loadIni() {
+        //TODO: Get this from the runpatch
+        // System.getProperty("jpackage.app-path");
+        File iniFile = new File("Game.ini");
+        Ini ini = new Ini();
+        if (iniFile.exists()) {
+            try {
+                ini.load(iniFile);
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
+        }
+        return ini;
+    }
+
+    private static void setupRTP(Ini ini, Game game) {
+        String rtpName = ini.get("Game", "RTP");
+        if (rtpName == null || rtpName.isEmpty()) return;
+
+        Preferences rtpNode = Preferences.systemRoot().node("com/example/jrgss/rtp");
+        String rtpPath = rtpNode.get(rtpName, null);
+        if (rtpPath == null) {
+            game.showMessageDialog("RTP not found: " + rtpName, JOptionPane.ERROR_MESSAGE);
+            System.exit(0);
+        }
+
+        RTP.PATH.addLast(rtpPath);
     }
 
     private static void setupFonts() {
-        //TODO: integrate with RTP
-        File fontsDir = new File("Fonts");
+        for (File file : RTP.listDir(null, "Fonts")) {
+            String suffix = FileSupport.getSuffix(file);
+            if (suffix == null || !suffix.matches("ttf|otf"))
+                continue;
 
-        String[] fileNames = fontsDir.list();
-        if (fileNames == null) return;
-
-        for (String fileName : fileNames) {
-            int dotIndex = fileName.lastIndexOf('.');
-            if (dotIndex <= 0) continue;
-
-            String suffix = fileName.substring(dotIndex + 1);
-            if (suffix.equalsIgnoreCase("ttf")) {
-                File fontFile = new File(fontsDir, fileName);
-
-                Font font = null;
-                try {
-                    font = Font.createFont(Font.TRUETYPE_FONT, fontFile);
-                } catch (IOException | FontFormatException e) {
-                    e.printStackTrace();
-                    continue;
-                }
-
-                GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+            Font font = null;
+            try {
+                font = Font.createFont(Font.TRUETYPE_FONT, file);
+            } catch (IOException | FontFormatException ex) {
+                ex.printStackTrace();
+                continue;
             }
+
+            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
         }
     }
 
     public final String title;
-    public final ParsedArgs args;
 
     public GameFrame frame = null;
 
@@ -92,15 +119,19 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
 
     public final Set<Integer> pressed = ConcurrentHashMap.newKeySet();
 
+    private static final Cursor transparentCursor;
+    static {
+        BufferedImage transparentImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(0, 0), "transparent");
+    }
+
     private final Timer hideCursorTimer = new Timer(500, this::hideCursor);
     {
         hideCursorTimer.setRepeats(false);
     }
 
-    public Game(String title, ParsedArgs args) {
+    public Game(String title) {
         this.title = title;
-        this.args = args;
-
         setPreferredSize(new Dimension(544, 416));
         setBackground(Color.BLACK);
         setIgnoreRepaint(true);
@@ -172,7 +203,7 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
         g.dispose();
     }
 
-    public void messageBox(String message, int messageType) {
+    public void showMessageDialog(String message, int messageType) {
         JOptionPane.showMessageDialog(frame, message, title, messageType);
     }
 
@@ -216,14 +247,5 @@ public class Game extends Canvas implements Callable<Integer>, KeyboardState {
 
     public KeyboardState getKeyboardState() {
         return new KeyboardState.Snapshot(pressed);
-    }
-
-    // this is called after the game window has opened
-    @Override
-    public Integer call() throws Exception {
-        ScriptEngine scriptEngine = new ScriptEngine(this);
-        scriptEngine.setGlobalVariable("$TEST", args.test || args.btest);
-        scriptEngine.setGlobalVariable("$BTEST", args.btest);
-        return scriptEngine.runScripts();
     }
 }

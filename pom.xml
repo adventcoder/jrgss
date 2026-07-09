@@ -41,6 +41,16 @@
             <version>0.5.4</version>
         </dependency>
         <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-openal</artifactId>
+            <version>3.3.6</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.trilarion</groupId>
+            <artifactId>java-vorbis-support</artifactId>
+            <version>1.2.1</version>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
             <version>6.0.3</version>

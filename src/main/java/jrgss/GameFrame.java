@@ -1,15 +1,12 @@
 package jrgss;
 
 import java.awt.AWTEvent;
-import java.awt.EventQueue;
 import java.awt.Frame;
 import java.awt.Point;
 import java.awt.event.WindowEvent;
 
 public class GameFrame extends Frame {
     private final Game game;
-    private Thread gameThread;
-    private Integer gameExitStatus;
     private boolean fpsShowing;
     private int fps;
 
@@ -32,31 +29,7 @@ public class GameFrame extends Frame {
     public void processWindowEvent(WindowEvent e) {
         super.processWindowEvent(e);
         switch (e.getID()) {
-            case WindowEvent.WINDOW_OPENED -> {
-                game.createBufferStrategy(2);
-                game.requestFocus();
-                gameThread = new Thread(() -> {
-                    try {
-                        gameExitStatus = game.call();
-                    } catch (Exception exc) {
-                        exc.printStackTrace();
-                    } finally {
-                        // the game ended, so we just dispose ourselves gracefully, arigatou gozaimasu
-                        EventQueue.invokeLater(() -> dispose());
-                    }
-                }, "game-main");
-                gameThread.setDaemon(true);
-                gameThread.start();
-            }
             case WindowEvent.WINDOW_CLOSING -> {
-                // gameThread.interrupt();
-                // gameThread.join();
-                System.exit(0);
-            }
-            case WindowEvent.WINDOW_CLOSED -> {
-                // we use the exit status for ruby errors. in all other cases we exit with 0.
-                if (gameExitStatus != null)
-                    System.err.println("Ignoring game exit status of " + gameExitStatus);
                 System.exit(0);
             }
             case WindowEvent.WINDOW_ACTIVATED -> {
