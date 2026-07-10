@@ -128,7 +128,7 @@ public class RubyInput {
     @JRubyMethod(meta = true)
     public static void update(IRubyObject recv) {
         Game game = RubySupport.getGame(recv.getRuntime());
-        KeyboardState keyboardState = game.getKeyboardState();
+        KeyboardState keyboardState = game.getAsyncKeyboardState().snapshot();
         for (RubyInput input : inputs.values())
             input.updateInput(keyboardState);
     }

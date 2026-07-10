@@ -226,7 +226,7 @@ public class RubyFont extends RubyObject {
             Font font = lookupFont(name.asString().asJavaString(), style, sizePts);
             if (font != null) return font;
         }
-        return new Font(Font.SANS_SERIF, Font.PLAIN, 1);
+        return new Font(Font.SANS_SERIF, style, sizePts);
     }
 
     private static Font lookupFont(String name, int style, int sizePts) {

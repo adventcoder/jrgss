@@ -1,20 +1,33 @@
 package jrgss;
 
-import java.awt.AWTEvent;
 import java.awt.Frame;
 import java.awt.Point;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+import lombok.Getter;
 
 public class GameFrame extends Frame {
-    private final Game game;
-    private boolean fpsShowing;
-    private int fps;
+    public final Game game;
+
+    private @Getter boolean fpsShowing;
+    private @Getter int fps;
+
+    private ReentrantLock activeLock = new ReentrantLock();
+    private Condition activated = activeLock.newCondition();
+    private @Getter boolean active = false;
+
+    private ReentrantLock openLock = new ReentrantLock();
+    private Condition opened = openLock.newCondition();
+    private @Getter boolean open = false;
 
     public GameFrame(Game game) {
         this.game = game;
 
         if (game.frame != null)
-            throw new IllegalStateException("frame already created");
+            throw new IllegalStateException("game already framed");
         game.frame = this;
 
         setResizable(false);
@@ -22,22 +35,82 @@ public class GameFrame extends Frame {
         add(game);
         pack();
         setLocationRelativeTo(null);
-        enableEvents(AWTEvent.WINDOW_EVENT_MASK);
+
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                // if (graceful) {
+                //     game.shutdown();
+                //     game.awaitTermination() // must wait before disposing self or the game could access the disposed ui
+                //     dispose();
+                // } else {
+                System.exit(0);
+                // }
+            }
+
+            @Override
+            public void windowOpened(WindowEvent e) {
+                openLock.lock();
+                try {
+                    open = true;
+                    opened.signalAll();
+                } finally {
+                    openLock.unlock();
+                }
+            }
+
+            @Override
+            public void windowClosed(WindowEvent e) {
+                openLock.lock();
+                try {
+                    open = false;
+                } finally {
+                    openLock.unlock();
+                }
+            }
+
+            @Override
+            public void windowActivated(WindowEvent e) {
+                activeLock.lock();
+                try {
+                    active = true;
+                    activated.signalAll();
+                } finally {
+                    activeLock.unlock();
+                }
+            }
+
+            @Override
+            public void windowDeactivated(WindowEvent e) {
+                activeLock.lock();
+                try {
+                    active = false;
+                } finally {
+                    activeLock.unlock();
+                }
+            }
+        });
     }
 
-    @Override
-    public void processWindowEvent(WindowEvent e) {
-        super.processWindowEvent(e);
-        switch (e.getID()) {
-            case WindowEvent.WINDOW_CLOSING -> {
-                System.exit(0);
-            }
-            case WindowEvent.WINDOW_ACTIVATED -> {
-                game.setActive(true);
-            }
-            case WindowEvent.WINDOW_DEACTIVATED -> {
-                game.setActive(false);
-            }
+    public void setFps(int fps) {
+        int oldFps = this.fps;
+        this.fps = fps;
+        if (fps != oldFps)
+            updateTitle();
+    }
+
+    public void setFpsShowing(boolean fpsShowing) {
+        boolean oldFpsShowing = this.fpsShowing;
+        this.fpsShowing = fpsShowing;
+        if (fpsShowing != oldFpsShowing)
+            updateTitle();
+    }
+
+    private void updateTitle() {
+        if (fpsShowing) {
+            setTitle(String.format("%s - %d FPS", game.getTitle(), fps));
+        } else {
+            setTitle(game.getTitle());
         }
     }
 
@@ -56,22 +129,23 @@ public class GameFrame extends Frame {
         setLocation(center.x - getWidth() / 2, center.y - getHeight() / 2);
     }
 
-    public void setFps(int fps) {
-        if (this.fps == fps) return;
-        this.fps = fps;
-        updateTitle();
+    public void awaitActive() throws InterruptedException {
+        activeLock.lock();
+        try {
+            while (!active)
+                activated.await();
+        } finally {
+            activeLock.unlock();
+        }
     }
 
-    public void toggleFpsShowing() {
-        fpsShowing = !fpsShowing;
-        updateTitle();
-    }
-
-    private void updateTitle() {
-        if (fpsShowing) {
-            setTitle(String.format("%s - %d FPS", game.title, fps));
-        } else {
-            setTitle(game.title);
+    public void awaitOpen() throws InterruptedException {
+        openLock.lock();
+        try {
+            while (!open)
+                opened.await();
+        } finally {
+            openLock.unlock();
         }
     }
 }

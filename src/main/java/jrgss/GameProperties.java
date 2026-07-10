@@ -42,13 +42,18 @@ public class GameProperties {
     public void store() throws BackingStoreException {
         Preferences node = Preferences.userRoot().node("jrgss");
         node.putBoolean(LAUNCH_IN_FULLSCREEN_KEY, launchInFullscreen);
-        node.putBoolean(PLAY_MUSIC_KEY, launchInFullscreen);
-        node.putBoolean(PLAY_SOUND_KEY, launchInFullscreen);
+        node.putBoolean(PLAY_MUSIC_KEY, playMusic);
+        node.putBoolean(PLAY_SOUND_KEY, playSound);
         node.putByteArray(BUTTON_ASSIGN_KEY, buttonAssign);
         node.flush();
     }
 
     public void apply() {
         RubyInput.assignButtons(buttonAssign, keyCodes);
+    }
+
+    public static void main(String[] args) throws BackingStoreException {
+        GameProperties props = new GameProperties();
+        props.store();
     }
 }

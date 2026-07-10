@@ -1,10 +1,8 @@
 package jrgss;
 
-import java.awt.AWTEvent;
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Cursor;
-import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontFormatException;
@@ -14,25 +12,19 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Toolkit;
-import java.awt.event.ActionEvent;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 
-import javax.swing.BorderFactory;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
-import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.Timer;
@@ -41,9 +33,10 @@ import javax.swing.UIManager;
 import org.ini4j.Ini;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.html.HtmlEscapers;
 
-public class Game extends Canvas implements KeyboardState {
+import lombok.Getter;
+
+public class Game extends Canvas {
     //TODO: replace stderr printing with logger
     public static final Logger logger = Logger.getLogger(Game.class.getName());
 
@@ -58,15 +51,12 @@ public class Game extends Canvas implements KeyboardState {
 
         GameFrame frame = new GameFrame(game);
         frame.setVisible(true);
-
-        game.requestFocus();
-        game.createBufferStrategy(2);
-
-        //TODO: we should wait for the window to be fully opened here...
-        // some visible problems like error message box flashing otherwise
-        Thread.sleep(100);
+        frame.awaitOpen();
 
         try {
+            game.requestFocus();
+            game.createBufferStrategy(2);
+
             setupRTP(ini, game);
             setupFonts();
 
@@ -79,11 +69,8 @@ public class Game extends Canvas implements KeyboardState {
     }
 
     private static Ini loadIni() {
-        //TODO: Get this from the app path?
-        // File appFile = new File(System.getProperty("jpackage.app-path"));
-        // File iniFile = FileSupport.addSuffix(FileSupport.removeSuffix(appFile), "ini");
-        File iniFile = new File("Game.ini");
         Ini ini = new Ini();
+        File iniFile = getIniFile();
         if (iniFile.exists()) {
             try {
                 ini.load(iniFile);
@@ -94,7 +81,15 @@ public class Game extends Canvas implements KeyboardState {
         return ini;
     }
 
-    private static void setupRTP(Ini ini, Game game) throws Exception {
+    private static File getIniFile() {
+        String appPath = System.getProperty("jpackage.app-path");
+        if (appPath != null)
+            return FileSupport.replaceSuffix(new File(appPath), "ini");
+        // logger.warning("app-path not set, using default ini location");
+        return new File("Game.ini");
+    }
+
+    private static void setupRTP(Ini ini, Game game) {
         String rtpName = ini.get("Game", "RTP");
         if (rtpName == null || rtpName.isEmpty()) return;
 
@@ -127,27 +122,17 @@ public class Game extends Canvas implements KeyboardState {
         }
     }
 
-    public final String title;
-
     public GameFrame frame = null;
-
+    private final @Getter String title;
+    private final @Getter KeyboardState.Async asyncKeyboardState = new KeyboardState.Async(this);
     private final AtomicBoolean reset = new AtomicBoolean(false);
 
-    private final ReentrantLock activeLock = new ReentrantLock();
-    private final Condition activated = activeLock.newCondition();
-    private boolean active = false;
-
-    public final Set<Integer> pressed = ConcurrentHashMap.newKeySet();
-
-    private final Cursor transparentCursor;
-    {
-        BufferedImage transparentImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-        transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(0, 0), "transparent");
+    public boolean postReset() {
+        return reset.compareAndSet(false, true);
     }
 
-    private final Timer hideCursorTimer = new Timer(500, this::hideCursor);
-    {
-        hideCursorTimer.setRepeats(false);
+    public boolean pollReset() {
+        return reset.compareAndSet(true, false);
     }
 
     public Game(String title) {
@@ -155,66 +140,53 @@ public class Game extends Canvas implements KeyboardState {
         setPreferredSize(new Dimension(544, 416));
         setBackground(Color.BLACK);
         setIgnoreRepaint(true);
-        enableEvents(AWTEvent.KEY_EVENT_MASK | AWTEvent.FOCUS_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK);
+
+        initKeyboardShortcuts();
+        initCursorHiding();
     }
 
-    @Override
-    public void processKeyEvent(KeyEvent e) {
-        super.processKeyEvent(e);
-        switch (e.getID()) {
-            case KeyEvent.KEY_PRESSED -> {
-                pressed.add(e.getKeyCode());
+    private void initKeyboardShortcuts() {
+        addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
                 switch (e.getKeyCode()) {
                     case KeyEvent.VK_F1 -> {
-                        Dialog dialog = new GamePropertiesDialog(frame);
+                        GamePropertiesDialog dialog = new GamePropertiesDialog(frame);
                         dialog.setVisible(true);
                     }
                     case KeyEvent.VK_F2 -> {
-                        frame.toggleFpsShowing();
+                        frame.setFpsShowing(!frame.isFpsShowing());
                     }
                     case KeyEvent.VK_F12 -> {
-                        if (!reset())
+                        if (!postReset())
                             System.err.println("Ignoring repeated reset");
                     }
                 }
             }
-            case KeyEvent.KEY_RELEASED -> {
-                pressed.remove(e.getKeyCode());
+        });
+    }
+
+    private void initCursorHiding() {
+        BufferedImage transparentImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Cursor transparentCursor = Toolkit.getDefaultToolkit().createCustomCursor(transparentImage, new Point(0, 0), "transparent");
+
+        Timer hideCursorTimer = new Timer(500, ae -> setCursor(transparentCursor));
+        hideCursorTimer.setRepeats(false);
+
+        MouseAdapter MouseAdapter = new MouseAdapter() {
+            public @Override void mouseEntered(MouseEvent e) { mouseActivated(e); }
+            public @Override void mousePressed(MouseEvent e) { mouseActivated(e); }
+            public @Override void mouseReleased(MouseEvent e) { mouseActivated(e); }
+            public @Override void mouseMoved(MouseEvent e) { mouseActivated(e); }
+            public @Override void mouseDragged(MouseEvent e) { mouseActivated(e); }
+
+            private void mouseActivated(MouseEvent e) {
+                setCursor(null);
+                hideCursorTimer.restart();
             }
-        }
-    }
-
-    @Override
-    public void processMouseEvent(MouseEvent e) {
-        super.processMouseEvent(e);
-        switch (e.getID()) {
-            case MouseEvent.MOUSE_ENTERED, MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED -> {
-                mouseActivated(e);
-            }
-        }
-    }
-
-    @Override
-    public void processMouseMotionEvent(MouseEvent e) {
-        super.processMouseEvent(e);
-        switch (e.getID()) {
-            case MouseEvent.MOUSE_MOVED, MouseEvent.MOUSE_DRAGGED -> {
-                mouseActivated(e);
-            }
-        }
-    }
-
-    private void mouseActivated(MouseEvent e) {
-        showCursor(e);
-        hideCursorTimer.restart();
-    }
-
-    private void showCursor(MouseEvent e) {
-        setCursor(null);
-    }
-
-    private void hideCursor(ActionEvent e) {
-        setCursor(transparentCursor);
+        };
+        addMouseListener(MouseAdapter);
+        addMouseMotionListener(MouseAdapter);
     }
 
     public void clear() {
@@ -238,11 +210,9 @@ public class Game extends Canvas implements KeyboardState {
         textArea.setFont(UIManager.getFont("Label.font"));
 
         Color messageForeground = UIManager.getColor("OptionPane.messageForeground");
-        if (messageForeground != null)
-            textArea.setForeground(messageForeground);
+        if (messageForeground != null) textArea.setForeground(messageForeground);
         Font messageFont = UIManager.getFont("OptionPane.messageFont");
-        if (messageFont != null)
-            textArea.setFont(messageFont);
+        if (messageFont != null) textArea.setFont(messageFont);
 
         // Calculate max height/width from rows/cols
         FontMetrics fm = textArea.getFontMetrics(textArea.getFont());
@@ -267,47 +237,5 @@ public class Game extends Canvas implements KeyboardState {
         }
 
         JOptionPane.showMessageDialog(frame, messageComponent, title, messageType);
-    }
-
-    public boolean reset() {
-        return reset.compareAndSet(false, true);
-    }
-
-    public boolean pollReset() {
-        return reset.compareAndSet(true, false);
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        activeLock.lock();
-        try {
-            this.active = active;
-            if (active)
-                activated.signalAll();
-        } finally {
-            activeLock.unlock();
-        }
-    }
-
-    public void awaitActive() throws InterruptedException {
-        activeLock.lock();
-        try {
-            while (!active)
-                activated.await();
-        } finally {
-            activeLock.unlock();
-        }
-    }
-
-    @Override
-    public boolean isPressed(int keyCode) {
-        return pressed.contains(keyCode);
-    }
-
-    public KeyboardState getKeyboardState() {
-        return new KeyboardState.Snapshot(pressed);
     }
 }

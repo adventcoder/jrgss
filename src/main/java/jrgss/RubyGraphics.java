@@ -110,32 +110,40 @@ public class RubyGraphics {
     public static void update(IRubyObject recv) throws InterruptedException {
         Game game = RubySupport.getGame(recv.getRuntime());
 
+        if (frameStartTime >= 0)
+            endFrame(game);
+
+        game.frame.awaitActive();
+
+        startFrame(game, recv.getRuntime());
+    }
+
+    private static void startFrame(Game game, Ruby runtime) throws InterruptedException {
+        frameStartTime = System.nanoTime();
+
+        pollGameEvents(game, runtime);
+    }
+
+    private static void endFrame(Game game) throws InterruptedException {
         render(game.getBufferStrategy());
 
         long desiredFrameTime = 1000_000_000L / frameRate;
         long frameTime = System.nanoTime() - frameStartTime;
 
         // if there's time left, wait until the end of the frame
-        if (frameTime < desiredFrameTime) {
-            long sleepTime = desiredFrameTime - frameTime;
-            Thread.sleep(sleepTime / 1000_000L, (int) (sleepTime % 1000_000L));
-            frameTime = desiredFrameTime;
+        long timeRemaining = desiredFrameTime - frameTime;
+        if (timeRemaining > 0) {
+            Thread.sleep(timeRemaining / 1000_000L, (int) (timeRemaining % 1000_000L));
+            frameTime += timeRemaining;
         }
 
-        // advance to the next frame
-        frameStartTime += frameTime;
         frameCount++;
         updateFps(game, frameTime);
+    }
 
-        // at start of frame check game status
-
+    private static void pollGameEvents(Game game, Ruby runtime) {
         if (game.pollReset())
-            throw RubySupport.newRGSSReset(recv.getRuntime());
-
-        if (!game.isActive()) {
-            game.awaitActive();
-            frameStartTime = System.nanoTime();
-        }
+            throw RubySupport.newRGSSReset(runtime);
     }
 
     private static void updateFps(Game game, long frameTime) {

@@ -1,7 +1,4 @@
 
-msgbox_p 'hi'
-msgbox_p load_data('Data/Scripts.rvdata2')
-
 len = 0
 loop do
     Graphics.update

@@ -24,4 +24,8 @@ public class FileSupport {
         if (suffix == null) return file;
         return new File(file.getParentFile(), file.getName() + "." + suffix);
     }
+
+    public static File replaceSuffix(File file, String suffix) {
+        return addSuffix(removeSuffix(file), suffix);
+    }
 }
