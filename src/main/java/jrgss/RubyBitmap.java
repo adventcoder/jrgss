@@ -454,13 +454,13 @@ public class RubyBitmap extends RubyObject {
         checkDisposed();
         String path = args[0].asJavaString();
         String format = args.length >= 2 ? args[1].asJavaString() : null;
-        RubyHash opt = args.length >= 3 ? args[2].convertToHash() : null;
+        RubyHash opts = args.length >= 3 ? args[2].convertToHash() : null;
 
         JRubyFile file = new JRubyFile(getRuntime().getCurrentDirectory(), path);
         ImageWriter writer = getImageWriter(ImageTypeSpecifier.createFromRenderedImage(image), file, format);
 
         ImageWriteParam param = writer.getDefaultWriteParam();
-        if (opt != null) {
+        if (opts != null) {
             // parse options here...
         }
 

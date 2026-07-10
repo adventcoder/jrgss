@@ -118,8 +118,7 @@ public class RubyFunctions {
         if (!RS.isNil())
             msg.append(RS.asString());
 
-        Game game = RubySupport.getGame(context.getRuntime());
-        game.showMessageDialog(msg, JOptionPane.PLAIN_MESSAGE);
+        msgbox(context, msg.toString());
     }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
@@ -127,12 +126,16 @@ public class RubyFunctions {
         IRubyObject defaultRS = context.getRuntime().getGlobalVariables().getDefaultSeparator();
 
         StringBuilder msg = new StringBuilder();
-        for (IRubyObject arg : args) {
-            msg.append(RubyBasicObject.rbInspect(context, arg).asString());
+        for (int i = 0; i < args.length; i++) {
+            msg.append(RubyBasicObject.rbInspect(context, args[i]).asString());
             msg.append(defaultRS.asString());
         }
 
-        Game game = RubySupport.getGame(self.getRuntime());
-        game.showMessageDialog(msg, JOptionPane.PLAIN_MESSAGE);
+        msgbox(context, msg.toString());
+    }
+
+    private static void msgbox(ThreadContext context, String msg) {
+        Game game = RubySupport.getGame(context.getRuntime());
+        game.showMessageDialog(msg.toString(), JOptionPane.PLAIN_MESSAGE);
     }
 }

@@ -8,8 +8,10 @@ import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontFormatException;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.GraphicsEnvironment;
+import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
@@ -26,13 +28,20 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 
+import javax.swing.BorderFactory;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 import javax.swing.Timer;
 import javax.swing.UIManager;
 
 import org.ini4j.Ini;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.html.HtmlEscapers;
 
 public class Game extends Canvas implements KeyboardState {
     //TODO: replace stderr printing with logger
@@ -214,14 +223,50 @@ public class Game extends Canvas implements KeyboardState {
         g.dispose();
     }
 
-    public void showMessageDialog(CharSequence text, int messageType) {
-        //TODO: handle long text
-        // JTextArea textArea = new JTextArea(text.toString(), 0, 50);
-        // textArea.setLineWrap(true);
-        // textArea.setWrapStyleWord(true);
-        // textArea.setEditable(false);
-        // textArea.setSize(textArea.getPreferredSize());
-        JOptionPane.showMessageDialog(frame, text, title, messageType);
+    public void showMessageDialog(String message, int messageType) {
+        showMessageDialogEx(message, messageType, 20, 50);
+    }
+
+    public void showMessageDialogEx(String message, int messageType, int maxRows, int maxCols) {
+        JTextArea textArea = new JTextArea(message);
+        textArea.setEditable(false);
+        textArea.setFocusable(false);
+        textArea.setWrapStyleWord(true);
+        textArea.setBorder(UIManager.getBorder("Label.border"));
+        textArea.setForeground(UIManager.getColor("label.foreground"));
+        textArea.setBackground(UIManager.getColor("Label.background"));
+        textArea.setFont(UIManager.getFont("Label.font"));
+
+        Color messageForeground = UIManager.getColor("OptionPane.messageForeground");
+        if (messageForeground != null)
+            textArea.setForeground(messageForeground);
+        Font messageFont = UIManager.getFont("OptionPane.messageFont");
+        if (messageFont != null)
+            textArea.setFont(messageFont);
+
+        // Calculate max height/width from rows/cols
+        FontMetrics fm = textArea.getFontMetrics(textArea.getFont());
+        Insets insets = textArea.getInsets();
+        int maxWidth = maxCols*fm.charWidth('m') + insets.left + insets.right;
+        int maxHeight = maxRows*fm.getHeight() + insets.top + insets.bottom;
+
+        // enable line wrapping if needed
+        int uncappedWidth = textArea.getPreferredSize().width;
+        if (uncappedWidth > maxWidth) {
+            textArea.setSize(maxWidth, Integer.MAX_VALUE);
+            textArea.setLineWrap(true);
+        }
+
+        // enable scrolling if needed
+        JComponent messageComponent = textArea;
+        int uncappedHeight = textArea.getPreferredSize().height;
+        if (uncappedHeight > maxHeight) {
+            JScrollPane scrollPane = new JScrollPane(textArea);
+            scrollPane.setPreferredSize(new Dimension(textArea.getWidth(), maxHeight));
+            messageComponent = scrollPane;
+        }
+
+        JOptionPane.showMessageDialog(frame, messageComponent, title, messageType);
     }
 
     public boolean reset() {

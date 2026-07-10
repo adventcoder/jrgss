@@ -68,8 +68,4 @@ public class RTP {
         }
         return null;
     }
-
-    public static void main(String[] args) {
-        System.out.println(findFile("src/main/java", "jrgss/RTP"));
-    }
  }
