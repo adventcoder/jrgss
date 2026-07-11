@@ -169,24 +169,26 @@ public class RubyTable extends RubyData {
     }
 
     @JRubyMethod(name = "[]=", rest = true)
-    public void op_aset(IRubyObject... args) {
+    public IRubyObject op_aset(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, arity + 1, arity + 1);
+        IRubyObject obj = args[arity];
         int i = 0;
         if (arity >= 3) {
             int z = RubyNumeric.num2int(args[2]);
-            if (z < 0 || z >= zsize) return;
+            if (z < 0 || z >= zsize) return obj;
             i = i*zsize + z;
         }
         if (arity >= 2) {
             int y = RubyNumeric.num2int(args[1]);
-            if (y < 0 || y >= ysize) return;
+            if (y < 0 || y >= ysize) return obj;
             i = i*ysize + y;
         }
         if (arity >= 1) {
             int x = RubyNumeric.num2int(args[0]);
-            if (x < 0 || x >= xsize) return;
+            if (x < 0 || x >= xsize) return obj;
             i = i*xsize + x;
         }
-        data[i] = (short) RubyNumeric.num2long(args[arity]);
+        data[i] = (short) RubyNumeric.num2long(obj);
+        return obj;
     }
 }

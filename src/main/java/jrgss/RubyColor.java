@@ -99,8 +99,9 @@ public class RubyColor extends RubyData {
     }
 
     @JRubyMethod(name = "red=")
-    public void set_red(IRubyObject obj) {
+    public IRubyObject set_red(IRubyObject obj) {
         this.red = RubySupport.numToDoubleInRangeClamped(obj, 0.0, 255.0);
+        return obj;
     }
 
     @JRubyMethod
@@ -109,8 +110,9 @@ public class RubyColor extends RubyData {
     }
 
     @JRubyMethod(name = "green=")
-    public void set_green(IRubyObject obj) {
+    public IRubyObject set_green(IRubyObject obj) {
         this.green = RubySupport.numToDoubleInRangeClamped(obj, 0.0, 255.0);
+        return obj;
     }
 
     @JRubyMethod(name = "blue")
@@ -119,8 +121,9 @@ public class RubyColor extends RubyData {
     }
 
     @JRubyMethod(name = "blue=")
-    public void set_blue(IRubyObject obj) {
+    public IRubyObject set_blue(IRubyObject obj) {
         this.blue = RubySupport.numToDoubleInRangeClamped(obj, 0.0, 255.0);
+        return obj;
     }
 
     @JRubyMethod(name = "alpha")
@@ -129,8 +132,9 @@ public class RubyColor extends RubyData {
     }
 
     @JRubyMethod(name = "alpha=")
-    public void set_alpha(IRubyObject obj) {
+    public IRubyObject set_alpha(IRubyObject obj) {
         this.alpha = RubySupport.numToDoubleInRangeClamped(obj, 0.0, 255.0);
+        return obj;
     }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)

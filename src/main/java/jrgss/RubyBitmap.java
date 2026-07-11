@@ -6,6 +6,7 @@ import java.awt.Font;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
+import java.awt.GraphicsEnvironment;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.TexturePaint;
@@ -54,10 +55,15 @@ public class RubyBitmap extends RubyObject {
         font = runtime.getNil();
     }
 
+    public static RubyBitmap newBitmap(Ruby runtime, int width, int height) {
+        RubyBitmap bmp = new RubyBitmap(runtime, RubySupport.Bitmap);
+        bmp.initialize(RubyNumeric.int2fix(runtime, width), RubyNumeric.int2fix(runtime, width));
+        return bmp;
+    }
+
     @JRubyMethod
     public void initialize(IRubyObject arg0, IRubyObject arg1) {
-        Game game = RubySupport.getGame(getRuntime());
-        GraphicsConfiguration gc = game.getGraphicsConfiguration();
+        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         image = gc.createCompatibleImage(RubyNumeric.num2int(arg0), RubyNumeric.num2int(arg1), Transparency.TRANSLUCENT);
         font = RubyFont.newFont(getRuntime());
     }
@@ -73,8 +79,7 @@ public class RubyBitmap extends RubyObject {
             throw RubySupport.newRGSSError(getRuntime(), "failed to create bitmap: " + ioe.getMessage());
         }
 
-        Game game = RubySupport.getGame(getRuntime());
-        GraphicsConfiguration gc = game.getGraphicsConfiguration();
+        GraphicsConfiguration gc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
         if (gc.getColorModel().isCompatibleRaster(image.getRaster())) {
             image.coerceData(gc.getColorModel().isAlphaPremultiplied());
         } else {
@@ -126,13 +131,13 @@ public class RubyBitmap extends RubyObject {
     }
 
     public Graphics2D getGraphics() {
+        checkDisposed();
         if (graphics == null)
             createGraphics();
         return graphics;
     }
     
     private void createGraphics() {
-        checkDisposed();
         graphics = image.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -157,8 +162,9 @@ public class RubyBitmap extends RubyObject {
     }
 
     @JRubyMethod(name = "font=")
-    public void set_font(IRubyObject obj) {
+    public IRubyObject set_font(IRubyObject obj) {
         getFont().initialize_copy(obj);
+        return obj;
     }
 
     @JRubyMethod

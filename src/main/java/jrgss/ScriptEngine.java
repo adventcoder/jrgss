@@ -73,8 +73,9 @@ public class ScriptEngine implements AutoCloseable {
 
     private void runScript(int i) throws IOException, InterruptedException {
         String file = String.format("{%04d}", i);
-        String title = getScriptTitle(i);
-        try (InputStream in = new FileInputStream("Scripts/" + file + " " + title + ".rb")) {
+        // String scriptFile = "test.rb";
+        String scriptFile = file + " " + getScriptTitle(i) + ".rb";
+        try (InputStream in = new FileInputStream("Scripts/" + scriptFile)) {
             String script = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             runtime.executeScript(script, file);
         }

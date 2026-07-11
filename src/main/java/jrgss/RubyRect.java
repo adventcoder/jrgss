@@ -98,8 +98,9 @@ public class RubyRect extends RubyData {
     }
 
     @JRubyMethod(name = "x=")
-    public void set_x(IRubyObject obj) {
+    public IRubyObject set_x(IRubyObject obj) {
         this.x = RubyNumeric.num2int(obj);
+        return obj;
     }
 
     @JRubyMethod
@@ -108,8 +109,9 @@ public class RubyRect extends RubyData {
     }
 
     @JRubyMethod(name = "y=")
-    public void set_y(IRubyObject obj) {
+    public IRubyObject set_y(IRubyObject obj) {
         this.y = RubyNumeric.num2int(obj);
+        return obj;
     }
 
     @JRubyMethod
@@ -118,8 +120,9 @@ public class RubyRect extends RubyData {
     }
 
     @JRubyMethod(name = "width=")
-    public void set_width(IRubyObject obj) {
+    public IRubyObject set_width(IRubyObject obj) {
         this.width = RubyNumeric.num2int(obj);
+        return obj;
     }
 
     @JRubyMethod
@@ -128,8 +131,9 @@ public class RubyRect extends RubyData {
     }
 
     @JRubyMethod(name = "height=")
-    public void set_height(IRubyObject obj) {
+    public IRubyObject set_height(IRubyObject obj) {
         this.height = RubyNumeric.num2int(obj);
+        return obj;
     }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)

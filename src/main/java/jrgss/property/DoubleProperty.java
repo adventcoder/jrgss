@@ -45,9 +45,10 @@ public class DoubleProperty<T extends IRubyObject> {
         }
     }
 
-    public void set(IRubyObject self, IRubyObject arg0) {
+    public IRubyObject set(IRubyObject self, IRubyObject arg0) {
         try {
             field.setDouble(self, rubyToJava.applyAsDouble(arg0));
+            return arg0;
         } catch (IllegalAccessException ex) {
             throw self.getRuntime().newSecurityError(ex.getMessage());
         }
@@ -71,8 +72,7 @@ public class DoubleProperty<T extends IRubyObject> {
         rubyClass.addMethod(attrName + "=", new JavaMethod.JavaMethodOne(rubyClass, Visibility.PUBLIC, attrName + "=") {
             @Override
             public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0) {
-                set(self, arg0);
-                return arg0;
+                return set(self, arg0);
             }
         });
     }

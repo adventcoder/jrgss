@@ -49,14 +49,14 @@ public class RubyFont extends RubyObject {
     public static @JRubyMethod(meta = true) IRubyObject default_color(IRubyObject recv) { return getDefaultFont(recv).color(); }
     public static @JRubyMethod(meta = true) IRubyObject default_out_color(IRubyObject recv) { return getDefaultFont(recv).out_color(); }
 
-    public static @JRubyMethod(meta = true, name = "default_name=") void set_default_name(IRubyObject recv, IRubyObject obj) { getDefaultFont(recv).set_name(obj); }
-    public static @JRubyMethod(meta = true, name = "default_size=") void set_default_size(IRubyObject recv, IRubyObject obj) { getDefaultFont(recv).set_size(obj); }
-    public static @JRubyMethod(meta = true, name = "default_bold=") void set_default_bold(IRubyObject recv, IRubyObject obj) { getDefaultFont(recv).set_bold(obj); }
-    public static @JRubyMethod(meta = true, name = "default_italic=") void set_default_italic(IRubyObject recv, IRubyObject obj) { getDefaultFont(recv).set_italic(obj); }
-    public static @JRubyMethod(meta = true, name = "default_outline=") void set_default_outline(IRubyObject recv, IRubyObject obj) { getDefaultFont(recv).set_outline(obj); }
-    public static @JRubyMethod(meta = true, name = "default_shadow=") void set_default_shadow(IRubyObject recv, IRubyObject obj) { getDefaultFont(recv).set_shadow(obj); }
-    public static @JRubyMethod(meta = true, name = "default_color=") void set_default_color(IRubyObject recv, IRubyObject obj) { getDefaultFont(recv).set_color(obj); }
-    public static @JRubyMethod(meta = true, name = "default_out_color=") void set_default_out_color(IRubyObject recv, IRubyObject obj) { getDefaultFont(recv).set_out_color(obj); }
+    public static @JRubyMethod(meta = true, name = "default_name=") IRubyObject set_default_name(IRubyObject recv, IRubyObject obj) { return getDefaultFont(recv).set_name(obj); }
+    public static @JRubyMethod(meta = true, name = "default_size=") IRubyObject set_default_size(IRubyObject recv, IRubyObject obj) { return getDefaultFont(recv).set_size(obj); }
+    public static @JRubyMethod(meta = true, name = "default_bold=") IRubyObject set_default_bold(IRubyObject recv, IRubyObject obj) { return getDefaultFont(recv).set_bold(obj); }
+    public static @JRubyMethod(meta = true, name = "default_italic=") IRubyObject set_default_italic(IRubyObject recv, IRubyObject obj) { return getDefaultFont(recv).set_italic(obj); }
+    public static @JRubyMethod(meta = true, name = "default_outline=") IRubyObject set_default_outline(IRubyObject recv, IRubyObject obj) { return getDefaultFont(recv).set_outline(obj); }
+    public static @JRubyMethod(meta = true, name = "default_shadow=") IRubyObject set_default_shadow(IRubyObject recv, IRubyObject obj) { return getDefaultFont(recv).set_shadow(obj); }
+    public static @JRubyMethod(meta = true, name = "default_color=") IRubyObject set_default_color(IRubyObject recv, IRubyObject obj) { return getDefaultFont(recv).set_color(obj); }
+    public static @JRubyMethod(meta = true, name = "default_out_color=") IRubyObject set_default_out_color(IRubyObject recv, IRubyObject obj) { return getDefaultFont(recv).set_out_color(obj); }
 
     public IRubyObject name;
     public double size;
@@ -88,9 +88,10 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(name = "name=")
-    public void set_name(IRubyObject obj) {
+    public IRubyObject set_name(IRubyObject obj) {
         name = obj;
         baseFont = null;
+        return obj;
     }
 
     @JRubyMethod
@@ -99,8 +100,9 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(name = "size=")
-    public void set_size(IRubyObject obj) {
+    public IRubyObject set_size(IRubyObject obj) {
         size = RubySupport.numToDoubleInRange(obj, "size", 6.0, 96.0);
+        return obj;
     }
 
     @JRubyMethod
@@ -109,9 +111,10 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(name = "bold=")
-    public void set_bold(IRubyObject obj) {
+    public IRubyObject set_bold(IRubyObject obj) {
         this.bold = obj.isTrue();
         updateBaseStyle();
+        return obj;
     }
 
     @JRubyMethod
@@ -120,9 +123,10 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(name = "italic=")
-    public void set_italic(IRubyObject obj) {
+    public IRubyObject set_italic(IRubyObject obj) {
         this.italic = obj.isTrue();
         updateBaseStyle();
+        return obj;
     }
 
     @JRubyMethod
@@ -131,8 +135,9 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(name = "outline=")
-    public void set_outline(IRubyObject obj) {
+    public IRubyObject set_outline(IRubyObject obj) {
         this.outline = obj.isTrue();
+        return obj;
     }
 
     @JRubyMethod
@@ -141,8 +146,9 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(name = "shadow=")
-    public void set_shadow(IRubyObject obj) {
+    public IRubyObject set_shadow(IRubyObject obj) {
         this.shadow = obj.isTrue();
+        return obj;
     }
 
     @JRubyMethod
@@ -151,8 +157,9 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(name = "color=")
-    public void set_color(IRubyObject obj) {
+    public IRubyObject set_color(IRubyObject obj) {
         this.color.set(obj);
+        return obj;
     }
 
     @JRubyMethod
@@ -161,8 +168,9 @@ public class RubyFont extends RubyObject {
     }
 
     @JRubyMethod(name = "out_color=")
-    public void set_out_color(IRubyObject obj) {
+    public IRubyObject set_out_color(IRubyObject obj) {
         this.outColor.set(obj);
+        return obj;
     }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, optional = 2)

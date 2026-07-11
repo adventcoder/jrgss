@@ -44,8 +44,9 @@ public class RubyGraphics {
     }
 
     @JRubyMethod(meta = true, name = "frame_rate=")
-    public static void set_frame_rate(IRubyObject recv, IRubyObject obj) {
-        frameRate = Math.min(Math.max(RubyNumeric.num2int(obj), 10), 120);
+    public static IRubyObject set_frame_rate(IRubyObject recv, IRubyObject obj) {
+        frameRate = RubySupport.numToIntInRangeClamped(obj, 10, 120);
+        return obj;
     }
 
     @JRubyMethod(meta = true)
@@ -54,8 +55,9 @@ public class RubyGraphics {
     }
 
     @JRubyMethod(meta = true, name = "frame_count=")
-    public static void set_frame_count(IRubyObject recv, IRubyObject obj) {
+    public static IRubyObject set_frame_count(IRubyObject recv, IRubyObject obj) {
         frameCount = RubyNumeric.num2long(obj);
+        return obj;
     }
 
     @JRubyMethod(meta = true)
@@ -75,7 +77,7 @@ public class RubyGraphics {
         Game game = RubySupport.getGame(recv.getRuntime());
         int width = RubyNumeric.num2int(arg0);
         int height = RubyNumeric.num2int(arg1);
-        //TODO: somtimes this breaks rendering... also needs to clamp width/height
+        //TODO: somtimes this breaks rendering... also need to clamp width/height
         EventQueue.invokeAndWait(() -> {
             game.setPreferredSize(new Dimension(width, height));
             game.frame.repack();

@@ -134,8 +134,4 @@ public class RubySupport {
     public static RaiseException newFileNotFoundError(Ruby runtime, FileNotFoundException ex) {
         return runtime.newErrnoENOENTError(ex.getMessage().replaceFirst(" \\([^)]*\\)$", ""));
     }
-
-    // Properties
-
-   
 }
