@@ -1,22 +1,26 @@
 package jrgss;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.Objects;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyFixnum;
 import org.jruby.RubyNumeric;
+import org.jruby.RubyObject;
+import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.Helpers;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
-public class RubyTable extends RubyData {
+public class RubyTable extends RubyObject {
     public static RubyClass createTableClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Table", runtime.getObject(), RubyTable::new);
         RubySupport.Table = cls;
-        cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyTable.class);
         return cls;
     }
@@ -125,8 +129,36 @@ public class RubyTable extends RubyData {
         return obj;
     }
 
+    @JRubyMethod(name = "==")
     @Override
-    public String toString() {
+    public IRubyObject op_equal(ThreadContext context, IRubyObject other) {
+        Ruby runtime = context.runtime;
+        if (this == other) return runtime.getTrue();
+        if (other instanceof RubyTable table)
+            return runtime.newBoolean(arity == table.arity && xsize == table.xsize && ysize == table.ysize && zsize == table.zsize && Arrays.equals(data, table.data));
+        return runtime.getFalse();
+    }
+
+    @JRubyMethod(name = "eql?")
+    @Override
+    public IRubyObject eql_p(IRubyObject other) {
+        return op_equal(getRuntime().getCurrentContext(), other);
+    }
+
+    @JRubyMethod
+    @Override
+    public RubyFixnum hash() {
+        long h = Helpers.hashStart(getRuntime(), arity);
+        h = Helpers.murmurCombine(h, xsize);
+        h = Helpers.murmurCombine(h, ysize);
+        h = Helpers.murmurCombine(h, zsize);
+        h = Helpers.murmurCombine(h, Arrays.hashCode(data));
+        return getRuntime().newFixnum(Helpers.hashEnd(h));
+    }
+
+    @JRubyMethod
+    @Override
+    public IRubyObject to_s() {
         StringBuilder sb = new StringBuilder();
         if (arity == 1)
             appendX(sb, 0, 0, "");
@@ -134,7 +166,7 @@ public class RubyTable extends RubyData {
             appendY(sb, 0, "");
         else
             appendZ(sb, "");
-        return sb.toString();
+        return RubyString.newString(getRuntime(), sb);
     }
 
     private void appendZ(StringBuilder sb, String margin) {
@@ -167,27 +199,9 @@ public class RubyTable extends RubyData {
         sb.append(")");
     }
 
-    @Override
-    public boolean equals(Object other) {
-        if (this == other) return true;
-        if (!(other instanceof RubyTable table)) return false;
-        return xsize == table.xsize && ysize == table.ysize && zsize == table.zsize && Arrays.equals(data, table.data);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = Objects.hash(xsize, ysize, zsize);
-        result = result * 31 + Arrays.hashCode(data);
-        return result;
-    }
-
-    @Override
-    public int dataSize() {
-        return 5*Integer.SIZE + data.length*Short.SIZE;
-    }
-
-    @Override
-    public void dump(ByteBuffer buf) {
+    @JRubyMethod
+    public IRubyObject _dump(IRubyObject arg) {
+        ByteBuffer buf = ByteBuffer.allocate(Integer.BYTES*5 + Short.BYTES*data.length).order(ByteOrder.LITTLE_ENDIAN);
         buf.putInt(arity);
         buf.putInt(xsize);
         buf.putInt(ysize);
@@ -195,17 +209,21 @@ public class RubyTable extends RubyData {
         buf.putInt(data.length);
         for (short val : data)
             buf.putShort(val);
+        return RubySupport.newString(getRuntime(), buf, false);
     }
 
-    @Override
-    public void load(ByteBuffer buf) {
+    @JRubyMethod(meta = true)
+    public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
+        ByteBuffer buf = RubySupport.getByteBuffer(obj.convertToString());
+        RubyTable table = (RubyTable) ((RubyClass) recv).allocate();
         //TODO: sanity checking
-        arity = buf.getInt();
-        xsize = buf.getInt();
-        ysize = buf.getInt();
-        zsize = buf.getInt();
-        data = new short[buf.getInt()];
-        for (int i = 0; i < data.length; i++)
-            data[i] = buf.getShort();
+        table.arity = buf.getInt();
+        table.xsize = buf.getInt();
+        table.ysize = buf.getInt();
+        table.zsize = buf.getInt();
+        table.data = new short[buf.getInt()];
+        for (int i = 0; i < table.data.length; i++)
+            table.data[i] = buf.getShort();
+        return table;
     }
 }

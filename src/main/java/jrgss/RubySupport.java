@@ -1,13 +1,16 @@
 package jrgss;
 
 import java.io.FileNotFoundException;
+import java.nio.ByteBuffer;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
+import org.jruby.RubyString;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.ByteList;
 
 import lombok.experimental.UtilityClass;
 
@@ -103,5 +106,16 @@ public class RubySupport {
 
     public static RaiseException newFileNotFoundError(Ruby runtime, FileNotFoundException ex) {
         return runtime.newErrnoENOENTError(ex.getMessage().replaceFirst(" \\([^)]*\\)$", ""));
+    }
+
+    // Helpers
+
+    public static RubyString newString(Ruby runtime, ByteBuffer buf, boolean copy) {
+        return runtime.newString(new ByteList(buf.array(), buf.arrayOffset(), buf.position(), copy));
+    }
+
+    public static ByteBuffer getByteBuffer(RubyString str) {
+        ByteList byteList = str.getByteList();
+        return ByteBuffer.wrap(byteList.unsafeBytes(), byteList.begin(), byteList.realSize());
     }
 }

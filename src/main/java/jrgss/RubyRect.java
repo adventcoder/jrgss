@@ -1,27 +1,25 @@
 package jrgss;
 
 import java.awt.Rectangle;
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyFixnum;
 import org.jruby.RubyNumeric;
+import org.jruby.RubyObject;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.Helpers;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
-import lombok.EqualsAndHashCode;
-
-@EqualsAndHashCode(callSuper = false)
-public class RubyRect extends RubyData {
+public class RubyRect extends RubyObject {
     public static void createRectClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Rect", runtime.getObject(), RubyRect::new);
         RubySupport.Rect = cls;
-        cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyRect.class);
     }
 
@@ -38,12 +36,8 @@ public class RubyRect extends RubyData {
         super(runtime, metaClass, useObjectSpace);
     }
 
-    public RubyRect(Ruby runtime, boolean useObjectSpace) {
-        super(runtime, RubySupport.Rect, useObjectSpace);
-    }
-
     public static RubyRect newRect(Ruby runtime, int x, int y, int width, int height) {
-        RubyRect rect = new RubyRect(runtime, true);
+        RubyRect rect = new RubyRect(runtime, RubySupport.Rect);
         rect.x = x;
         rect.y = y;
         rect.width = width;
@@ -52,7 +46,7 @@ public class RubyRect extends RubyData {
     }
 
     public static RubyRect newRectLight(Ruby runtime, int x, int y, int width, int height) {
-        RubyRect rect = new RubyRect(runtime, false);
+        RubyRect rect = new RubyRect(runtime, RubySupport.Rect, false);
         rect.x = x;
         rect.y = y;
         rect.width = width;
@@ -61,12 +55,7 @@ public class RubyRect extends RubyData {
     }
 
     public static RubyRect newRectLight(Ruby runtime, IRubyObject[] args, int i) {
-        RubyRect rect = new RubyRect(runtime, false);
-        rect.x = RubyNumeric.num2int(args[i]);
-        rect.y = RubyNumeric.num2int(args[i + 1]);
-        rect.width = RubyNumeric.num2int(args[i + 2]);
-        rect.height = RubyNumeric.num2int(args[i + 3]);
-        return rect;
+        return newRectLight(runtime, RubyNumeric.num2int(args[i]), RubyNumeric.num2int(args[i+1]), RubyNumeric.num2int(args[i+2]), RubyNumeric.num2int(args[i+3]));
     }
 
     public Rectangle getRectangle() {
@@ -157,29 +146,56 @@ public class RubyRect extends RubyData {
         return obj;
     }
 
+    @JRubyMethod
     @Override
-    public String toString() {
-        return String.format("(%d, %d, %d, %d)", x, y, width, height);
+    public IRubyObject to_s() {
+        return getRuntime().newString(String.format("(%d, %d, %d, %d)", x, y, width, height));
     }
 
+    @JRubyMethod(name = "==")
     @Override
-    public int dataSize() {
-        return Integer.SIZE*4;
+    public IRubyObject op_equal(ThreadContext context, IRubyObject other) {
+        Ruby runtime = context.runtime;
+        if (this == other) return runtime.getTrue();
+        if (other instanceof RubyRect rect)
+            return runtime.newBoolean(x == rect.x && y == rect.y && width == rect.width && height == rect.height);
+        return runtime.getFalse();
     }
 
+    @JRubyMethod(name = "eql?")
     @Override
-    public void dump(ByteBuffer buf) {
+    public IRubyObject eql_p(IRubyObject other) {
+        return op_equal(getRuntime().getCurrentContext(), other);
+    }
+
+    @JRubyMethod
+    @Override
+    public RubyFixnum hash() {
+        long h = Helpers.hashStart(getRuntime(), x);
+        h = Helpers.murmurCombine(h, y);
+        h = Helpers.murmurCombine(h, width);
+        h = Helpers.murmurCombine(h, height);        
+        return getRuntime().newFixnum(Helpers.hashEnd(h));
+    }
+
+    @JRubyMethod
+    public IRubyObject _dump(IRubyObject arg) {
+        ByteBuffer buf = ByteBuffer.allocate(Integer.BYTES*4).order(ByteOrder.LITTLE_ENDIAN);
         buf.putInt(x);
         buf.putInt(y);
         buf.putInt(width);
         buf.putInt(height);
+        return RubySupport.newString(getRuntime(), buf, false);
     }
 
-    @Override
-    public void load(ByteBuffer buf) {
-        x = buf.getInt();
-        y = buf.getInt();
-        width = buf.getInt();
-        height = buf.getInt();
+    @JRubyMethod(meta = true)
+    public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
+        ByteBuffer buf = RubySupport.getByteBuffer(obj.convertToString());
+        RubyRect rect = (RubyRect) ((RubyClass) recv).allocate();
+        rect.x = buf.getInt();
+        rect.y = buf.getInt();
+        rect.width = buf.getInt();
+        rect.height = buf.getInt();
+        return rect;
     }
 }

@@ -1,30 +1,25 @@
 package jrgss;
 
 import java.awt.Color;
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.function.IntFunction;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
+import org.jruby.RubyFixnum;
 import org.jruby.RubyNumeric;
+import org.jruby.RubyObject;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.Helpers;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
-import lombok.EqualsAndHashCode;
-
-@EqualsAndHashCode(callSuper = false)
-public class RubyColor extends RubyData {
+public class RubyColor extends RubyObject {
     public static void createColorClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Color", runtime.getObject(), RubyColor::new);
         RubySupport.Color = cls;
-        cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyColor.class);
     }
 
@@ -38,12 +33,8 @@ public class RubyColor extends RubyData {
         super(runtime, metaClass);
     }
 
-    public RubyColor(Ruby runtime) {
-        super(runtime, RubySupport.Color);
-    }
-
     public static RubyColor newColor(Ruby runtime, double red, double green, double blue, double alpha) {
-        RubyColor color = new RubyColor(runtime);
+        RubyColor color = new RubyColor(runtime, RubySupport.Color);
         color.red = red;
         color.green = green;
         color.blue = blue;
@@ -96,17 +87,12 @@ public class RubyColor extends RubyData {
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
     public void initialize(IRubyObject... args) {
         if (args.length == 0) {
-            clear();
+            set();
+        } else if (args.length == 1) {
+            set(args[0]);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 3, 4);
-            set_red(args[0]);
-            set_green(args[1]);
-            set_blue(args[2]);
-            if (args.length >= 4) {
-                set_alpha(args[3]);
-            } else {
-                this.alpha = 255.0;
-            }
+            set(args[0], args[1], args[2], args.length == 3 ? null : args[3]);
         }
     }
 
@@ -116,27 +102,22 @@ public class RubyColor extends RubyData {
         return set(orig);
     }
 
-    public void clear() {
-        this.red = 0.0;
-        this.green = 0.0;
-        this.blue = 0.0;
-        this.alpha = 0.0;
-        this.color = null;
-    }
-
     @JRubyMethod(rest = true)
     public IRubyObject set(IRubyObject... args) {
         if (args.length == 1) {
             return set(args[0]);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 3, 4);
-            set_red(args[0]);
-            set_green(args[1]);
-            set_blue(args[2]);
-            if (args.length >= 4)
-                set_alpha(args[3]);
-            return this;
+            return set(args[0], args[1], args[2], args.length == 3 ? null : args[3]);
         }
+    }
+
+    public void set() {
+        this.red = 0.0;
+        this.green = 0.0;
+        this.blue = 0.0;
+        this.alpha = 0.0;
+        this.color = null;
     }
 
     public IRubyObject set(IRubyObject obj) {
@@ -149,6 +130,18 @@ public class RubyColor extends RubyData {
             this.color = color.color;
         } else {
             throw obj.getRuntime().newTypeError(obj, RubySupport.Color);
+        }
+        return this;
+    }
+
+    public IRubyObject set(IRubyObject red, IRubyObject green, IRubyObject blue, IRubyObject alpha) {
+        set_red(red);
+        set_green(green);
+        set_blue(blue);
+        if (alpha == null) {
+            this.alpha = 255.0;
+        } else {
+            set_alpha(alpha);
         }
         return this;
     }
@@ -181,30 +174,57 @@ public class RubyColor extends RubyData {
         return obj;
     }
 
+    @JRubyMethod
     @Override
-    public String toString() {
-        return String.format("(%f, %f, %f, %f)", red, green, blue, alpha);
+    public IRubyObject to_s() {
+        return getRuntime().newString(String.format("(%f, %f, %f, %f)", red, green, blue, alpha));
     }
 
+    @JRubyMethod(name = "==")
     @Override
-    public int dataSize() {
-        return Double.SIZE*4;
+    public IRubyObject op_equal(ThreadContext context, IRubyObject other) {
+        Ruby runtime = context.runtime;
+        if (this == other) return runtime.getTrue();
+        if (other instanceof RubyColor c)
+            return runtime.newBoolean(red == c.red && green == c.green && blue == c.blue && alpha == c.alpha);
+        return runtime.getFalse();
     }
 
+    @JRubyMethod(name = "eql?")
     @Override
-    public void dump(ByteBuffer buf) {
+    public IRubyObject eql_p(IRubyObject other) {
+        return op_equal(other.getRuntime().getCurrentContext(), other);
+    }
+
+    @JRubyMethod
+    @Override
+    public RubyFixnum hash() {
+        long h = Helpers.hashStart(getRuntime(), Double.doubleToLongBits(red));
+        h = Helpers.murmurCombine(h, Double.doubleToLongBits(green));
+        h = Helpers.murmurCombine(h, Double.doubleToLongBits(blue));
+        h = Helpers.murmurCombine(h, Double.doubleToLongBits(alpha));        
+        return getRuntime().newFixnum(Helpers.hashEnd(h));
+    }
+
+    @JRubyMethod
+    public IRubyObject _dump(IRubyObject arg) {
+        ByteBuffer buf = ByteBuffer.allocate(Double.BYTES*4).order(ByteOrder.LITTLE_ENDIAN);
         buf.putDouble(red);
         buf.putDouble(green);
         buf.putDouble(blue);
         buf.putDouble(alpha);
+        return RubySupport.newString(getRuntime(), buf, false);
     }
 
-    @Override
-    public void load(ByteBuffer buf) {
-        red = clamp(buf.getDouble());
-        green = clamp(buf.getDouble());
-        blue = clamp(buf.getDouble());
-        alpha = clamp(buf.getDouble());
+    @JRubyMethod(meta = true)
+    public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
+        ByteBuffer buf = RubySupport.getByteBuffer(obj.convertToString());
+        RubyColor color = (RubyColor) ((RubyClass) recv).allocate();
+        color.red = buf.getDouble();
+        color.green = buf.getDouble();
+        color.blue = buf.getDouble();
+        color.alpha = buf.getDouble();
+        return color;
     }
 
     private static double clamp(double x) {

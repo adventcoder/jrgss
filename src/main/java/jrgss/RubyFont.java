@@ -68,8 +68,8 @@ public class RubyFont extends RubyObject {
         super(runtime, metaClass, useObjectSpace);
         // we shouldn't expose nulls after Font.allocate
         name = runtime.getNil();
-        color = new RubyColor(runtime);
-        outColor = new RubyColor(runtime);
+        color = new RubyColor(runtime, RubySupport.Color);
+        outColor = new RubyColor(runtime, RubySupport.Color);
     }
 
     public RubyFont(Ruby runtime, RubyClass metaClass) {
