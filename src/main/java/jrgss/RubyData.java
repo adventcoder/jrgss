@@ -2,8 +2,8 @@ package jrgss;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.jruby.Ruby;
@@ -14,6 +14,9 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
+
+import com.google.common.io.LittleEndianDataInputStream;
+import com.google.common.io.LittleEndianDataOutputStream;
 
 public abstract class RubyData extends RubyObject {
     public RubyData(Ruby runtime, RubyClass metaClass) {
@@ -58,7 +61,7 @@ public abstract class RubyData extends RubyObject {
     @JRubyMethod
     public IRubyObject _dump(IRubyObject arg) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (DataOutputStream out = new DataOutputStream(baos)) {
+        try (LittleEndianDataOutputStream out = new LittleEndianDataOutputStream(baos)) {
             dump(out);
         } catch (IOException ioe) {
             throw getRuntime().newIOErrorFromException(ioe);
@@ -67,7 +70,7 @@ public abstract class RubyData extends RubyObject {
         return getRuntime().newString(byteList);
     }
 
-    public abstract void dump(DataOutputStream out) throws IOException;
+    public abstract void dump(DataOutput out) throws IOException;
 
     @JRubyMethod(meta = true)
     public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
@@ -77,7 +80,7 @@ public abstract class RubyData extends RubyObject {
         RubyData data = (RubyData) ((RubyClass) recv).allocate();
 
         ByteArrayInputStream bais = new ByteArrayInputStream(byteList.getUnsafeBytes(), byteList.getBegin(), byteList.getRealSize());
-        try (DataInputStream in = new DataInputStream(bais)) {
+        try (LittleEndianDataInputStream in = new LittleEndianDataInputStream(bais)) {
             data.load(in);
         } catch (IOException ioe) {
             throw recv.getRuntime().newIOErrorFromException(ioe);
@@ -86,5 +89,5 @@ public abstract class RubyData extends RubyObject {
         return data;
     }
 
-    public abstract void load(DataInputStream in) throws IOException;
+    public abstract void load(DataInput in) throws IOException;
 }

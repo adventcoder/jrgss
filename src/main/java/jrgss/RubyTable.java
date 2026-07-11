@@ -1,7 +1,7 @@
 package jrgss;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.jruby.Ruby;
@@ -79,7 +79,7 @@ public class RubyTable extends RubyData {
     }
 
     @Override
-    public void dump(DataOutputStream out) throws IOException {
+    public void dump(DataOutput out) throws IOException {
         out.writeInt(arity);
         out.writeInt(xsize);
         out.writeInt(ysize);
@@ -90,7 +90,7 @@ public class RubyTable extends RubyData {
     }
 
     @Override
-    public void load(DataInputStream in) throws IOException {
+    public void load(DataInput in) throws IOException {
         //TODO: sanity checking
         arity = in.readInt();
         xsize = in.readInt();
@@ -171,7 +171,6 @@ public class RubyTable extends RubyData {
     @JRubyMethod(name = "[]=", rest = true)
     public void op_aset(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, arity + 1, arity + 1);
-        IRubyObject obj = args[arity];
         int i = 0;
         if (arity >= 3) {
             int z = RubyNumeric.num2int(args[2]);
@@ -188,6 +187,6 @@ public class RubyTable extends RubyData {
             if (x < 0 || x >= xsize) return;
             i = i*xsize + x;
         }
-        data[i] = (short) RubyNumeric.num2long(obj);
+        data[i] = (short) RubyNumeric.num2long(args[arity]);
     }
 }

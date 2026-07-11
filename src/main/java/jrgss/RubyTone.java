@@ -1,7 +1,7 @@
 package jrgss;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.jruby.Ruby;
@@ -42,7 +42,7 @@ public class RubyTone extends RubyData {
     }
 
     @Override
-    public void dump(DataOutputStream out) throws IOException {
+    public void dump(DataOutput out) throws IOException {
         out.writeDouble(red);
         out.writeDouble(green);
         out.writeDouble(blue);
@@ -50,7 +50,7 @@ public class RubyTone extends RubyData {
     }
 
     @Override
-    public void load(DataInputStream in) throws IOException {
+    public void load(DataInput in) throws IOException {
         this.red = in.readDouble();
         this.green = in.readDouble();
         this.blue = in.readDouble();

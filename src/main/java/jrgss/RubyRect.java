@@ -1,8 +1,8 @@
 package jrgss;
 
 import java.awt.Rectangle;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 
 import org.jruby.Ruby;
@@ -78,14 +78,14 @@ public class RubyRect extends RubyData {
     }
 
     @Override
-    public void dump(DataOutputStream out) throws IOException {
+    public void dump(DataOutput out) throws IOException {
         out.writeInt(x);
         out.writeInt(y);
         out.writeInt(width);
         out.writeInt(height);
     }
 
-    public void load(DataInputStream in) throws IOException {
+    public void load(DataInput in) throws IOException {
         x = in.readInt();
         y = in.readInt();
         width = in.readInt();
