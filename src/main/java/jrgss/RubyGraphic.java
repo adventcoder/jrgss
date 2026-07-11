@@ -19,14 +19,14 @@ public abstract class RubyGraphic extends RubyObject {
         this.viewport = runtime.getNil();
     }
 
-    public @JRubyMethod IRubyObject viewport() { return viewport; }
-    public @JRubyMethod IRubyObject z() { return getRuntime().newFixnum(z); }
-    public @JRubyMethod IRubyObject visible() { return getRuntime().newBoolean(visible); }
-
     public void initialize(IRubyObject viewport) {
         set_viewport(viewport);
         z = 0;
         visible = false;
+    }
+
+    public IRubyObject viewport() {
+        return viewport;
     }
 
     @JRubyMethod(name = "viewport=")
@@ -49,10 +49,20 @@ public abstract class RubyGraphic extends RubyObject {
         return obj;
     }
 
+    @JRubyMethod
+    public IRubyObject z() {
+        return getRuntime().newFixnum(z);
+    }
+
     @JRubyMethod(name = "z=")
     public IRubyObject set_z(IRubyObject obj) {
         this.z = RubyNumeric.fix2int(obj);
         return obj;
+    }
+
+    @JRubyMethod
+    public IRubyObject visible() {
+        return getRuntime().newBoolean(visible);
     }
 
     @JRubyMethod(name = "visible=")

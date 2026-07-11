@@ -154,9 +154,8 @@ public class RubyBitmap extends RubyObject {
     }
 
     @JRubyMethod(name = "font=")
-    public IRubyObject set_font(IRubyObject obj) {
+    public void set_font(IRubyObject obj) {
         font.initialize_copy(obj);
-        return obj;
     }
 
     @JRubyMethod
@@ -191,7 +190,7 @@ public class RubyBitmap extends RubyObject {
     }
 
     @JRubyMethod
-    public IRubyObject set_pixel(IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
+    public void set_pixel(IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
         checkDisposed();
         int x = RubyNumeric.num2int(arg0);
         int y = RubyNumeric.num2int(arg1);
@@ -199,8 +198,6 @@ public class RubyBitmap extends RubyObject {
 
         if ((x >= 0) && (y >= 0) && (x < image.getWidth()) && (y < image.getHeight()))
             image.setRGB(x, y, color.getARGB());
-
-        return color;
     }
 
     @JRubyMethod
@@ -237,7 +234,7 @@ public class RubyBitmap extends RubyObject {
     public void fill_rect(RubyRect rect, RubyColor color) {
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.Src);
-        g.setColor(color.getColor());
+        g.setColor(color.toAwtColor());
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
 
@@ -256,13 +253,13 @@ public class RubyBitmap extends RubyObject {
         g.setComposite(AlphaComposite.Src);
         if (vertical.isTrue()) {
             g.setPaint(new GradientPaint(
-                rect.x, rect.y, color1.getColor(),
-                rect.x, rect.y + rect.height - 1, color2.getColor()
+                rect.x, rect.y, color1.toAwtColor(),
+                rect.x, rect.y + rect.height - 1, color2.toAwtColor()
             ));
         } else {
             g.setPaint(new GradientPaint(
-                rect.x, rect.y, color1.getColor(),
-                rect.x + rect.width - 1, rect.y, color2.getColor()
+                rect.x, rect.y, color1.toAwtColor(),
+                rect.x + rect.width - 1, rect.y, color2.toAwtColor()
             ));
         }
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
@@ -308,7 +305,7 @@ public class RubyBitmap extends RubyObject {
 
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.Src.derive(opacity / 255.0f));
-        g.setPaint(new TexturePaint(src.image, srcRect.getRectangle()));
+        g.setPaint(new TexturePaint(src.image, srcRect.toAwtRectangle()));
         g.fillRect(rect.x, rect.y, rect.width, rect.height);
     }
 

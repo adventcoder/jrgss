@@ -1,23 +1,20 @@
 package jrgss;
 
 import java.io.FileNotFoundException;
-import java.nio.ByteBuffer;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
-import org.jruby.RubyString;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.internal.runtime.GlobalVariable.Scope;
+import org.jruby.javasupport.JavaObject;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.ByteList;
 
 import lombok.experimental.UtilityClass;
 
 @UtilityClass
 public class RubySupport {
-    public static Game game;
-
     public static RubyClass RGSSError;
     public static RubyClass RGSSReset;
 
@@ -32,9 +29,14 @@ public class RubySupport {
     public static RubyModule Input;
     public static RubyModule Audio;
 
+    public static void setGame(Ruby runtime, Game game) {
+        runtime.defineReadonlyVariable("$__GAME__", JavaObject.wrap(runtime, game), Scope.GLOBAL);
+    }
+
     public static Game getGame(Ruby runtime) {
-        //TODO: store this per runtime...?
-        return game;
+        IRubyObject gameObj = runtime.getGlobalVariables().get("$__GAME__");
+        if (gameObj.isNil()) return null;
+        return (Game) ((JavaObject) gameObj).getValue();
     }
 
     public static void bootstrap(Ruby runtime) {
@@ -60,6 +62,13 @@ public class RubySupport {
     }
 
     // Argument Checking
+
+    public static double clampRange(IRubyObject obj, double min, double max) {
+        double val = RubyNumeric.num2dbl(obj);
+        if (val < min) return min;
+        if (val > max) return max;
+        return val;
+    }
 
     public static double checkRange(IRubyObject obj, String name, double min, double max) {
         double val = RubyNumeric.num2dbl(obj);
@@ -106,16 +115,5 @@ public class RubySupport {
 
     public static RaiseException newFileNotFoundError(Ruby runtime, FileNotFoundException ex) {
         return runtime.newErrnoENOENTError(ex.getMessage().replaceFirst(" \\([^)]*\\)$", ""));
-    }
-
-    // Helpers
-
-    public static RubyString newString(Ruby runtime, ByteBuffer buf, boolean copy) {
-        return runtime.newString(new ByteList(buf.array(), buf.arrayOffset(), buf.position(), copy));
-    }
-
-    public static ByteBuffer getByteBuffer(RubyString str) {
-        ByteList byteList = str.getByteList();
-        return ByteBuffer.wrap(byteList.unsafeBytes(), byteList.begin(), byteList.realSize());
     }
 }

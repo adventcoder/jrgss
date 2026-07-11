@@ -25,18 +25,17 @@ public class ScriptEngine implements AutoCloseable {
     public ScriptEngine(Game game) {
         this.game = game;
         this.runtime = Ruby.newInstance();
-        runtime.getGlobalVariables().defineReadonly("$GAME", new ValueAccessor(null), null);
-        RubySupport.game = game;
+        RubySupport.setGame(runtime, game);
         RubySupport.bootstrap(runtime);
     }
 
-    public void setGlobalVariable(String name, Object obj) {
-        ValueAccessor var = new ValueAccessor(JavaEmbedUtils.javaToRuby(runtime, obj));
-        runtime.getGlobalVariables().define(name, var, Scope.GLOBAL);
+    public IRubyObject eval(Ruby runtime, String script) {
+        return runtime.evalScriptlet(script);
     }
 
-    public void loadScripts(String scriptsPath) {
-        //TODO
+    public void setGlobalVariable(String name, Object obj) {
+        IRubyObject rubyObj = JavaEmbedUtils.javaToRuby(runtime, obj);
+        runtime.getGlobalVariables().define(name, new ValueAccessor(rubyObj), Scope.GLOBAL);
     }
 
     public Integer runScripts() throws IOException, InterruptedException {
@@ -58,6 +57,7 @@ public class ScriptEngine implements AutoCloseable {
                     IRubyObject status = ((RubySystemExit) exc).status();
                     if (status != null && !status.isNil())
                         exitStatus = RubyNumeric.fix2int(status);
+                    System.out.println("Exit from ruby with status: " + exitStatus);
                     break;
                 } else if (runtime.getErrno().getClass("ENOENT").isInstance(exc)) {
                     String path = exc.getMessageAsJavaString().replaceFirst("^No such file or directory - ", "");
@@ -111,7 +111,7 @@ public class ScriptEngine implements AutoCloseable {
 
     @Override
     public void close() {
-        //TODO: unclear if this is needed
+        //TODO: unclear if this is needed, do we need to run at_exit hooks?
         runtime.tearDown(false);
     }
 }

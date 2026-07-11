@@ -43,7 +43,7 @@ public class Game extends Canvas {
 
         Ini ini = loadIni();
         String title = Objects.requireNonNullElse(ini.get("Game", "Title"), "Untitled");
-        String scriptsPath = ini.get("Game", "Scripts");
+        //String scriptsPath = ini.get("Game", "Scripts");
 
         Game game = new Game(title);
 
@@ -58,12 +58,15 @@ public class Game extends Canvas {
             setupRTP(ini, game);
             setupFonts();
 
-            ScriptEngine scriptEngine = new ScriptEngine(game);
-            scriptEngine.loadScripts(scriptsPath);
-            scriptEngine.runScripts();
+            try (ScriptEngine scriptEngine = new ScriptEngine(game)) {
+                scriptEngine.runScripts();
+            }
         } finally {
             frame.dispose();
         }
+
+        //
+        System.exit(0);
     }
 
     private static Ini loadIni() {
@@ -193,10 +196,10 @@ public class Game extends Canvas {
     }
 
     public void showMessageDialog(String message, int messageType) {
-        showMessageDialogEx(message, messageType, 20, 50);
+        showMessageDialog(message, messageType, 20, 50);
     }
 
-    public void showMessageDialogEx(String message, int messageType, int maxRows, int maxCols) {
+    public void showMessageDialog(String message, int messageType, int maxRows, int maxCols) {
         JTextArea textArea = new JTextArea(message);
         textArea.setEditable(false);
         textArea.setFocusable(false);

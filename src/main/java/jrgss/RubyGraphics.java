@@ -44,9 +44,8 @@ public class RubyGraphics {
     }
 
     @JRubyMethod(meta = true, name = "frame_rate=")
-    public static IRubyObject set_frame_rate(IRubyObject recv, IRubyObject obj) {
+    public static void set_frame_rate(IRubyObject recv, IRubyObject obj) {
         frameRate = Math.min(Math.max(RubyNumeric.num2int(obj), 10), 120);
-        return obj;
     }
 
     @JRubyMethod(meta = true)
@@ -55,9 +54,8 @@ public class RubyGraphics {
     }
 
     @JRubyMethod(meta = true, name = "frame_count=")
-    public static IRubyObject set_frame_count(IRubyObject recv, IRubyObject obj) {
+    public static void set_frame_count(IRubyObject recv, IRubyObject obj) {
         frameCount = RubyNumeric.num2long(obj);
-        return obj;
     }
 
     @JRubyMethod(meta = true)

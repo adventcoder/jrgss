@@ -12,10 +12,10 @@ import org.jruby.RubyObject;
 import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
-import org.jruby.runtime.Helpers;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.ByteList;
 
 public class RubyTable extends RubyObject {
     public static RubyClass createTableClass(Ruby runtime) {
@@ -36,8 +36,8 @@ public class RubyTable extends RubyObject {
     }
 
     public @JRubyMethod IRubyObject xsize() { return getRuntime().newFixnum(xsize); }
-    public @JRubyMethod IRubyObject ysize() { return getRuntime().newFixnum(xsize); }
-    public @JRubyMethod IRubyObject zsize() { return getRuntime().newFixnum(xsize); }
+    public @JRubyMethod IRubyObject ysize() { return getRuntime().newFixnum(ysize); }
+    public @JRubyMethod IRubyObject zsize() { return getRuntime().newFixnum(zsize); }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, required = 1, optional = 2)
     public void initialize(IRubyObject... args) {
@@ -106,27 +106,26 @@ public class RubyTable extends RubyObject {
     }
 
     @JRubyMethod(name = "[]=", rest = true)
-    public IRubyObject op_aset(IRubyObject... args) {
+    public void op_aset(IRubyObject... args) {
         Arity.checkArgumentCount(getRuntime(), args, arity + 1, arity + 1);
         IRubyObject obj = args[arity];
         int i = 0;
         if (arity >= 3) {
             int z = RubyNumeric.num2int(args[2]);
-            if (z < 0 || z >= zsize) return obj;
+            if (z < 0 || z >= zsize) return;
             i = i*zsize + z;
         }
         if (arity >= 2) {
             int y = RubyNumeric.num2int(args[1]);
-            if (y < 0 || y >= ysize) return obj;
+            if (y < 0 || y >= ysize) return;
             i = i*ysize + y;
         }
         if (arity >= 1) {
             int x = RubyNumeric.num2int(args[0]);
-            if (x < 0 || x >= xsize) return obj;
+            if (x < 0 || x >= xsize) return;
             i = i*xsize + x;
         }
         data[i] = (short) RubyNumeric.num2long(obj);
-        return obj;
     }
 
     @JRubyMethod(name = "==")
@@ -148,12 +147,13 @@ public class RubyTable extends RubyObject {
     @JRubyMethod
     @Override
     public RubyFixnum hash() {
-        long h = Helpers.hashStart(getRuntime(), arity);
-        h = Helpers.murmurCombine(h, xsize);
-        h = Helpers.murmurCombine(h, ysize);
-        h = Helpers.murmurCombine(h, zsize);
-        h = Helpers.murmurCombine(h, Arrays.hashCode(data));
-        return getRuntime().newFixnum(Helpers.hashEnd(h));
+        int h = 1;
+        h = h*31 + arity;
+        h = h*31 + xsize;
+        h = h*31 + ysize;
+        h = h*31 + zsize;
+        h = h*31 + Arrays.hashCode(data);
+        return getRuntime().newFixnum(h);
     }
 
     @JRubyMethod
@@ -209,12 +209,13 @@ public class RubyTable extends RubyObject {
         buf.putInt(data.length);
         for (short val : data)
             buf.putShort(val);
-        return RubySupport.newString(getRuntime(), buf, false);
+        return getRuntime().newString(new ByteList(buf.array(), false));
     }
 
     @JRubyMethod(meta = true)
     public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
-        ByteBuffer buf = RubySupport.getByteBuffer(obj.convertToString());
+        ByteList byteList = obj.convertToString().getByteList();
+        ByteBuffer buf = ByteBuffer.wrap(byteList.getUnsafeBytes(), byteList.getBegin(), byteList.getRealSize()).order(ByteOrder.LITTLE_ENDIAN);
         RubyTable table = (RubyTable) ((RubyClass) recv).allocate();
         //TODO: sanity checking
         table.arity = buf.getInt();

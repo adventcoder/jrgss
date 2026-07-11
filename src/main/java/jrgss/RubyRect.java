@@ -11,10 +11,10 @@ import org.jruby.RubyNumeric;
 import org.jruby.RubyObject;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
-import org.jruby.runtime.Helpers;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.ByteList;
 
 public class RubyRect extends RubyObject {
     public static void createRectClass(Ruby runtime) {
@@ -58,14 +58,49 @@ public class RubyRect extends RubyObject {
         return newRectLight(runtime, RubyNumeric.num2int(args[i]), RubyNumeric.num2int(args[i+1]), RubyNumeric.num2int(args[i+2]), RubyNumeric.num2int(args[i+3]));
     }
 
-    public Rectangle getRectangle() {
+    public Rectangle toAwtRectangle() {
         return new Rectangle(x, y, width, height);
     }
 
-    public @JRubyMethod IRubyObject x() { return  getRuntime().newFixnum(x); }
-    public @JRubyMethod IRubyObject y() { return  getRuntime().newFixnum(y); }
-    public @JRubyMethod IRubyObject width() { return  getRuntime().newFixnum(width); }
-    public @JRubyMethod IRubyObject height() { return  getRuntime().newFixnum(height); }
+    @JRubyMethod
+    public IRubyObject x() {
+        return  getRuntime().newFixnum(x);
+    }
+
+    @JRubyMethod(name = "x=")
+    public void set_x(IRubyObject obj) {
+        this.x = RubyNumeric.num2int(obj);
+    }
+
+    @JRubyMethod
+    public IRubyObject y() {
+        return  getRuntime().newFixnum(y);
+    }
+
+    @JRubyMethod(name = "y=")
+    public void set_y(IRubyObject obj) {
+        this.y = RubyNumeric.num2int(obj);
+    }
+
+    @JRubyMethod
+    public IRubyObject width() {
+        return  getRuntime().newFixnum(width);
+    }
+
+    @JRubyMethod(name = "width=")
+    public void set_width(IRubyObject obj) {
+        this.width = RubyNumeric.num2int(obj);
+    }
+
+    @JRubyMethod
+    public IRubyObject height() {
+        return getRuntime().newFixnum(height);
+    }
+
+    @JRubyMethod(name = "height=")
+    public void set_height(IRubyObject obj) {
+        this.height = RubyNumeric.num2int(obj);
+    }
 
     @JRubyMethod(visibility = Visibility.PRIVATE, rest = true)
     public void initialize(IRubyObject... args) {
@@ -122,30 +157,6 @@ public class RubyRect extends RubyObject {
         return this;
     }
 
-    @JRubyMethod(name = "x=")
-    public IRubyObject set_x(IRubyObject obj) {
-        this.x = RubyNumeric.num2int(obj);
-        return obj;
-    }
-
-    @JRubyMethod(name = "y=")
-    public IRubyObject set_y(IRubyObject obj) {
-        this.y = RubyNumeric.num2int(obj);
-        return obj;
-    }
-
-    @JRubyMethod(name = "width=")
-    public IRubyObject set_width(IRubyObject obj) {
-        this.width = RubyNumeric.num2int(obj);
-        return obj;
-    }
-
-    @JRubyMethod(name = "height=")
-    public IRubyObject set_height(IRubyObject obj) {
-        this.height = RubyNumeric.num2int(obj);
-        return obj;
-    }
-
     @JRubyMethod
     @Override
     public IRubyObject to_s() {
@@ -155,11 +166,9 @@ public class RubyRect extends RubyObject {
     @JRubyMethod(name = "==")
     @Override
     public IRubyObject op_equal(ThreadContext context, IRubyObject other) {
-        Ruby runtime = context.runtime;
-        if (this == other) return runtime.getTrue();
         if (other instanceof RubyRect rect)
-            return runtime.newBoolean(x == rect.x && y == rect.y && width == rect.width && height == rect.height);
-        return runtime.getFalse();
+            return context.runtime.newBoolean(x == rect.x && y == rect.y && width == rect.width && height == rect.height);
+        return super.op_equal(context, other);
     }
 
     @JRubyMethod(name = "eql?")
@@ -171,11 +180,12 @@ public class RubyRect extends RubyObject {
     @JRubyMethod
     @Override
     public RubyFixnum hash() {
-        long h = Helpers.hashStart(getRuntime(), x);
-        h = Helpers.murmurCombine(h, y);
-        h = Helpers.murmurCombine(h, width);
-        h = Helpers.murmurCombine(h, height);        
-        return getRuntime().newFixnum(Helpers.hashEnd(h));
+        int h = 1;
+        h = h*31 + x;
+        h = h*31 + y;
+        h = h*31 + width;
+        h = h*31 + height;
+        return getRuntime().newFixnum(h);
     }
 
     @JRubyMethod
@@ -185,12 +195,13 @@ public class RubyRect extends RubyObject {
         buf.putInt(y);
         buf.putInt(width);
         buf.putInt(height);
-        return RubySupport.newString(getRuntime(), buf, false);
+        return getRuntime().newString(new ByteList(buf.array(), false));
     }
 
     @JRubyMethod(meta = true)
     public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
-        ByteBuffer buf = RubySupport.getByteBuffer(obj.convertToString());
+        ByteList byteList = obj.convertToString().getByteList();
+        ByteBuffer buf = ByteBuffer.wrap(byteList.getUnsafeBytes(), byteList.getBegin(), byteList.getRealSize()).order(ByteOrder.LITTLE_ENDIAN);
         RubyRect rect = (RubyRect) ((RubyClass) recv).allocate();
         rect.x = buf.getInt();
         rect.y = buf.getInt();
