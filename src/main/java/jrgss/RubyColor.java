@@ -4,6 +4,10 @@ import java.awt.Color;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.function.IntFunction;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
@@ -183,19 +187,24 @@ public class RubyColor extends RubyData {
     }
 
     @Override
-    public void writeData(DataOutput out) throws IOException {
-        out.writeDouble(red);
-        out.writeDouble(green);
-        out.writeDouble(blue);
-        out.writeDouble(alpha);
+    public int dataSize() {
+        return Double.SIZE*4;
     }
 
     @Override
-    public void readData(DataInput in) throws IOException {
-        red = clamp(in.readDouble());
-        green = clamp(in.readDouble());
-        blue = clamp(in.readDouble());
-        alpha = clamp(in.readDouble());
+    public void dump(ByteBuffer buf) {
+        buf.putDouble(red);
+        buf.putDouble(green);
+        buf.putDouble(blue);
+        buf.putDouble(alpha);
+    }
+
+    @Override
+    public void load(ByteBuffer buf) {
+        red = clamp(buf.getDouble());
+        green = clamp(buf.getDouble());
+        blue = clamp(buf.getDouble());
+        alpha = clamp(buf.getDouble());
     }
 
     private static double clamp(double x) {

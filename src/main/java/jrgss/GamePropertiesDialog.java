@@ -26,7 +26,7 @@ public class GamePropertiesDialog extends JDialog {
     public GamePropertiesDialog(Frame owner) {
         super(owner, "Game Properties", true);
 
-        // props = GameProperties.load()
+        // GameProperties props = new GameProperties.load();
 
         JPanel root = new JPanel(new BorderLayout());
         root.setBorder(new EmptyBorder(6, 6, 6, 6));
@@ -76,8 +76,8 @@ public class GamePropertiesDialog extends JDialog {
             System.out.println("music: " + musicBox.isSelected());
             System.out.println("sounds: " + soundsBox.isSelected());
 
+            // props.apply();
             // props.save();
-            // RubyInput.assignButtons(props.buttonAsign);
             dispose();
         });
 

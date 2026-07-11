@@ -1,10 +1,15 @@
 package jrgss;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
 
 import org.jruby.Ruby;
 
@@ -68,4 +73,53 @@ public class RTP {
         }
         return null;
     }
- }
+
+    public static String getInstalledPath(String rtpName) {
+        Preferences rtpNode = Preferences.systemRoot().node("jrgss/rtp");
+        return rtpNode.get(rtpName, null);
+    }
+
+    public static void setInstalledPath(String rtpName, String rtpPath) throws BackingStoreException {
+        Preferences rtpNode = Preferences.systemRoot().node("jrgss/rtp");
+        rtpNode.put(rtpName, rtpPath);
+        rtpNode.flush();
+    }
+
+    public static class Windows {
+        // Make sure to run as administrator
+        public static void main(String[] args) throws Exception {
+            String libName = "RGSS3";
+            String rtpName = "RPGVXAce";
+            String rtpPath = getEnterbrainInstalledPath(libName, rtpName);
+            if (rtpPath == null) {
+                System.err.println("ERROR: " + rtpName + " RTP not installed for " + libName);
+                System.exit(1);
+            }
+            System.out.println("Found RTP: " + rtpPath);
+            setInstalledPath(rtpName, rtpPath);
+        }
+
+        private static String getEnterbrainInstalledPath(String libName, String rtpName) throws IOException {
+            Process process = new ProcessBuilder("reg", "query", "HKLM\\SOFTWARE\\Enterbrain\\" + libName + "\\RTP", "/v", rtpName, "/reg:32").start();
+            
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line = reader.readLine();
+                while (line != null) {
+                    String[] value = line.trim().split("\\s+", 3);
+                    if (value.length == 3 && value[0].equals(rtpName) && value[1].equals("REG_SZ"))
+                        return value[2];
+                    line = reader.readLine();
+                }
+            }
+
+            return null;
+        }
+    }
+
+    public static class Linux {
+        public static void main(String[] args) throws Exception {
+            String rtpName = "RPGVXAce";
+            setInstalledPath(rtpName, System.getProperty("user.home") + "/.local/share/jrgss/" + rtpName);
+        }
+    }
+}

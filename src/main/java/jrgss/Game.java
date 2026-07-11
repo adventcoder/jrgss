@@ -19,9 +19,9 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
-import java.util.prefs.Preferences;
 
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
@@ -31,8 +31,6 @@ import javax.swing.Timer;
 import javax.swing.UIManager;
 
 import org.ini4j.Ini;
-
-import com.google.common.base.MoreObjects;
 
 import lombok.Getter;
 
@@ -44,7 +42,7 @@ public class Game extends Canvas {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
         Ini ini = loadIni();
-        String title = MoreObjects.firstNonNull(ini.get("Game", "Title"), "Untitled");
+        String title = Objects.requireNonNullElse(ini.get("Game", "Title"), "Untitled");
         String scriptsPath = ini.get("Game", "Scripts");
 
         Game game = new Game(title);
@@ -93,8 +91,7 @@ public class Game extends Canvas {
         String rtpName = ini.get("Game", "RTP");
         if (rtpName == null || rtpName.isEmpty()) return;
 
-        Preferences rtpNode = Preferences.systemRoot().node("jrgss/rtp");
-        String rtpPath = rtpNode.get(rtpName, null);
+        String rtpPath = RTP.getInstalledPath(rtpName);
         if (rtpPath == null) {
             game.showMessageDialog(rtpName + " RTP is required to run this game.", JOptionPane.ERROR_MESSAGE);
             System.exit(0);

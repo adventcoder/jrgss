@@ -5,6 +5,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.BufferOverflowException;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.function.IntFunction;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
@@ -15,9 +20,6 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
-
-import com.google.common.io.LittleEndianDataInputStream;
-import com.google.common.io.LittleEndianDataOutputStream;
 
 //TODO: could probably use JavaObject for these...
 //TODO: or do i need this base class at all...
@@ -54,32 +56,28 @@ public abstract class RubyData extends RubyObject {
 
     @JRubyMethod
     public IRubyObject _dump(IRubyObject depth) {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (LittleEndianDataOutputStream dataOut = new LittleEndianDataOutputStream(baos)) {
-            writeData(dataOut);
-        } catch (IOException ex) {
-            throw getRuntime().newIOErrorFromException(ex);
-        }
-        ByteList bytes = new ByteList(baos.toByteArray(), false);
+        ByteBuffer buf = ByteBuffer.allocate(dataSize()).order(ByteOrder.LITTLE_ENDIAN);
+        dump(buf);
+        ByteList bytes = new ByteList(buf.array(), 0, buf.position(), false);
         return getRuntime().newString(bytes);
     }
 
     @JRubyMethod(meta = true)
     public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
-        Ruby runtime = recv.getRuntime();
-
         ByteList bytes = obj.convertToString().getByteList();
-        ByteArrayInputStream bais = new ByteArrayInputStream(bytes.getUnsafeBytes(), bytes.getBegin(), bytes.getRealSize());
+
+        ByteBuffer buf = ByteBuffer.wrap(bytes.getUnsafeBytes(), bytes.getBegin(), bytes.getRealSize()).order(ByteOrder.LITTLE_ENDIAN);
 
         RubyData dataObj = (RubyData) ((RubyClass) recv).allocate();
-        try (LittleEndianDataInputStream dataIn = new LittleEndianDataInputStream(bais)) {
-            dataObj.readData(dataIn);
-        } catch (IOException ex) {
-            throw runtime.newIOErrorFromException(ex);
+        try {
+            dataObj.load(buf);
+        } catch (BufferUnderflowException ex) {
+            throw recv.getRuntime().newArgumentError("not enough data");
         }
         return dataObj;
     }
 
-    public abstract void writeData(DataOutput out) throws IOException;
-    public abstract void readData(DataInput in) throws IOException;
+    public abstract int dataSize();
+    public abstract void dump(ByteBuffer buf);
+    public abstract void load(ByteBuffer buf);
 }

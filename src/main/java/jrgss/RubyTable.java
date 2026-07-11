@@ -1,8 +1,6 @@
 package jrgss;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -184,25 +182,30 @@ public class RubyTable extends RubyData {
     }
 
     @Override
-    public void writeData(DataOutput out) throws IOException {
-        out.writeInt(arity);
-        out.writeInt(xsize);
-        out.writeInt(ysize);
-        out.writeInt(zsize);
-        out.writeInt(data.length);
-        for (short val : data)
-            out.writeShort(val);
+    public int dataSize() {
+        return 5*Integer.SIZE + data.length*Short.SIZE;
     }
 
     @Override
-    public void readData(DataInput in) throws IOException {
+    public void dump(ByteBuffer buf) {
+        buf.putInt(arity);
+        buf.putInt(xsize);
+        buf.putInt(ysize);
+        buf.putInt(zsize);
+        buf.putInt(data.length);
+        for (short val : data)
+            buf.putShort(val);
+    }
+
+    @Override
+    public void load(ByteBuffer buf) {
         //TODO: sanity checking
-        arity = in.readInt();
-        xsize = in.readInt();
-        ysize = in.readInt();
-        zsize = in.readInt();
-        data = new short[in.readInt()];
+        arity = buf.getInt();
+        xsize = buf.getInt();
+        ysize = buf.getInt();
+        zsize = buf.getInt();
+        data = new short[buf.getInt()];
         for (int i = 0; i < data.length; i++)
-            data[i] = in.readShort();
+            data[i] = buf.getShort();
     }
 }

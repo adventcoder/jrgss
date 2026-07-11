@@ -4,6 +4,7 @@ import java.awt.Rectangle;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
@@ -162,18 +163,23 @@ public class RubyRect extends RubyData {
     }
 
     @Override
-    public void writeData(DataOutput out) throws IOException {
-        out.writeInt(x);
-        out.writeInt(y);
-        out.writeInt(width);
-        out.writeInt(height);
+    public int dataSize() {
+        return Integer.SIZE*4;
     }
 
     @Override
-    public void readData(DataInput in) throws IOException {
-        x = in.readInt();
-        y = in.readInt();
-        width = in.readInt();
-        height = in.readInt();
+    public void dump(ByteBuffer buf) {
+        buf.putInt(x);
+        buf.putInt(y);
+        buf.putInt(width);
+        buf.putInt(height);
+    }
+
+    @Override
+    public void load(ByteBuffer buf) {
+        x = buf.getInt();
+        y = buf.getInt();
+        width = buf.getInt();
+        height = buf.getInt();
     }
 }
