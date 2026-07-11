@@ -20,6 +20,7 @@ public class RubySupport {
 
     public static RubyClass Rect;
     public static RubyClass Color;
+    public static RubyClass Tone;
     public static RubyClass Table;
 
     public static RubyClass Bitmap;
@@ -45,6 +46,7 @@ public class RubySupport {
 
         RubyRect.createRectClass(runtime);
         RubyColor.createColorClass(runtime);
+        RubyTone.createToneClass(runtime);
         RubyTable.createTableClass(runtime);
 
         RubyBitmap.createBitmapClass(runtime);
@@ -63,14 +65,21 @@ public class RubySupport {
 
     // Argument Checking
 
-    public static double clampRange(IRubyObject obj, double min, double max) {
+    public static int numToIntInRangeClamped(IRubyObject obj, int min, int max) {
+        int val = RubyNumeric.num2int(obj);
+        if (val < min) return min;
+        if (val > max) return max;
+        return val;
+    }
+
+    public static double numToDoubleInRangeClamped(IRubyObject obj, double min, double max) {
         double val = RubyNumeric.num2dbl(obj);
         if (val < min) return min;
         if (val > max) return max;
         return val;
     }
 
-    public static double checkRange(IRubyObject obj, String name, double min, double max) {
+    public static double numToDoubleInRange(IRubyObject obj, String name, double min, double max) {
         double val = RubyNumeric.num2dbl(obj);
         if (val < min || val > max)
             throw obj.getRuntime().newArgumentError("bad value for " + name + " (" + val + " not between " + min + " and " + max + ")");
@@ -116,4 +125,8 @@ public class RubySupport {
     public static RaiseException newFileNotFoundError(Ruby runtime, FileNotFoundException ex) {
         return runtime.newErrnoENOENTError(ex.getMessage().replaceFirst(" \\([^)]*\\)$", ""));
     }
+
+    // Properties
+
+   
 }

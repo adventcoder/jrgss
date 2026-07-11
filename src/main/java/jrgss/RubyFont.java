@@ -94,7 +94,7 @@ public class RubyFont extends RubyObject {
 
     @JRubyMethod(name = "size=")
     public void set_size(IRubyObject obj) {
-        size = RubySupport.checkRange(obj, "size", 6.0, 96.0);
+        size = RubySupport.numToDoubleInRange(obj, "size", 6.0, 96.0);
     }
 
     @JRubyMethod

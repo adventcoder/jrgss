@@ -190,7 +190,7 @@ public class RubyBitmap extends RubyObject {
     }
 
     @JRubyMethod
-    public void set_pixel(IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
+    public IRubyObject set_pixel(IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
         checkDisposed();
         int x = RubyNumeric.num2int(arg0);
         int y = RubyNumeric.num2int(arg1);
@@ -198,6 +198,8 @@ public class RubyBitmap extends RubyObject {
 
         if ((x >= 0) && (y >= 0) && (x < image.getWidth()) && (y < image.getHeight()))
             image.setRGB(x, y, color.getARGB());
+
+        return arg2;
     }
 
     @JRubyMethod
@@ -211,7 +213,7 @@ public class RubyBitmap extends RubyObject {
             clear_rect((RubyRect) args[0]);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 4, 4);
-            clear_rect(RubyRect.newRectLight(getRuntime(), args, 0));
+            clear_rect(RubyRect.newRectLightFromArgs(getRuntime(), args, 0));
         }
     }
 
@@ -227,7 +229,7 @@ public class RubyBitmap extends RubyObject {
             fill_rect(RubySupport.asRect(args[0]), RubySupport.asColor(args[1]));
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 5, 5);
-            fill_rect(RubyRect.newRectLight(getRuntime(), args, 0), RubySupport.asColor(args[4]));
+            fill_rect(RubyRect.newRectLightFromArgs(getRuntime(), args, 0), RubySupport.asColor(args[4]));
         }
     }
 
@@ -241,17 +243,17 @@ public class RubyBitmap extends RubyObject {
     @JRubyMethod(rest = true)
     public void gradient_fill_rect(IRubyObject... args) {
         if (args.length >= 3 && args.length <= 4) {
-            gradient_fill_rect(RubySupport.asRect(args[0]), RubySupport.asColor(args[1]), RubySupport.asColor(args[2]), args.length >= 4 ? args[3] : getRuntime().getFalse());
+            gradient_fill_rect(RubySupport.asRect(args[0]), RubySupport.asColor(args[1]), RubySupport.asColor(args[2]), args.length >= 4 ? args[3].isTrue() : false);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 6, 7);
-            gradient_fill_rect(RubyRect.newRectLight(getRuntime(), args, 0), RubySupport.asColor(args[4]), RubySupport.asColor(args[5]), args.length >= 7 ? args[6] : getRuntime().getFalse());
+            gradient_fill_rect(RubyRect.newRectLightFromArgs(getRuntime(), args, 0), RubySupport.asColor(args[4]), RubySupport.asColor(args[5]), args.length >= 7 ? args[6].isTrue() : false);
         }
     }
 
-    public void gradient_fill_rect(RubyRect rect, RubyColor color1, RubyColor color2, IRubyObject vertical) {
+    public void gradient_fill_rect(RubyRect rect, RubyColor color1, RubyColor color2, boolean vertical) {
         Graphics2D g = getGraphics();
         g.setComposite(AlphaComposite.Src);
-        if (vertical.isTrue()) {
+        if (vertical) {
             g.setPaint(new GradientPaint(
                 rect.x, rect.y, color1.toAwtColor(),
                 rect.x, rect.y + rect.height - 1, color2.toAwtColor()
@@ -315,7 +317,7 @@ public class RubyBitmap extends RubyObject {
             draw_text(RubySupport.asRect(args[0]), args[1], args.length >= 3 ? RubyNumeric.num2int(args[2]) : 0);
         } else {
             Arity.checkArgumentCount(getRuntime(), args, 5, 6);
-            draw_text(RubyRect.newRectLight(getRuntime(), args, 0), args[4], args.length >= 6 ? RubyNumeric.num2int(args[5]) : 0);
+            draw_text(RubyRect.newRectLightFromArgs(getRuntime(), args, 0), args[4], args.length >= 6 ? RubyNumeric.num2int(args[5]) : 0);
         }
     }
 
@@ -437,7 +439,7 @@ public class RubyBitmap extends RubyObject {
     public void radial_blur(IRubyObject arg0, IRubyObject arg1) {
         checkDisposed();
         int amplitude = RubyNumeric.num2int(arg0);
-        int divisions = Math.min(Math.max(RubyNumeric.num2int(arg1), 2), 100);
+        int divisions = RubySupport.numToIntInRangeClamped(arg1, 2, 100);
         if (amplitude <= 0) return;
 
         //NOTE: we could cache the temp raster

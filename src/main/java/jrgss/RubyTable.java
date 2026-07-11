@@ -1,27 +1,28 @@
 package jrgss;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.Arrays;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 import org.jruby.Ruby;
 import org.jruby.RubyClass;
-import org.jruby.RubyFixnum;
 import org.jruby.RubyNumeric;
-import org.jruby.RubyObject;
-import org.jruby.RubyString;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Arity;
-import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.ByteList;
 
-public class RubyTable extends RubyObject {
+import lombok.EqualsAndHashCode;
+
+@EqualsAndHashCode(callSuper = false)
+public class RubyTable extends RubyData {
     public static RubyClass createTableClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Table", runtime.getObject(), RubyTable::new);
         RubySupport.Table = cls;
+
+        cls.defineAnnotatedMethods(RubyData.class);
         cls.defineAnnotatedMethods(RubyTable.class);
+
         return cls;
     }
 
@@ -33,6 +34,71 @@ public class RubyTable extends RubyObject {
 
     public RubyTable(Ruby runtime, RubyClass metaClass) {
         super(runtime, metaClass);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        if (arity == 1)
+            appendX(sb, 0, 0, "");
+        else if (arity == 2)
+            appendY(sb, 0, "");
+        else
+            appendZ(sb, "");
+        return sb.toString();
+    }
+
+    private void appendZ(StringBuilder sb, String margin) {
+        sb.append("(");
+        for (int z = 0; z < zsize; z++) {
+            if (z > 0)
+                sb.append(",\n\n").append(margin).append(" ");
+            appendY(sb, z, margin + " ");
+        }
+        sb.append(")");
+    }
+
+    private void appendY(StringBuilder sb, int z, String margin) {
+        sb.append("(");
+        for (int y = 0; y < ysize; y++) {
+            if (y > 0)
+                sb.append(",\n").append(margin).append(" ");
+            appendX(sb, z, y, margin + " ");
+        }
+        sb.append(")");
+    }
+
+    private void appendX(StringBuilder sb, int z, int y, String margin) {
+        sb.append("(");
+        for (int x = 0; x < xsize; x++) {
+            if (x > 0)
+                sb.append(", ");
+            sb.append(data[x + xsize*(y + ysize*z)]);
+        }
+        sb.append(")");
+    }
+
+    @Override
+    public void dump(DataOutputStream out) throws IOException {
+        out.writeInt(arity);
+        out.writeInt(xsize);
+        out.writeInt(ysize);
+        out.writeInt(zsize);
+        out.writeInt(data.length);
+        for (short val : data)
+            out.writeShort(val);
+    }
+
+    @Override
+    public void load(DataInputStream in) throws IOException {
+        //TODO: sanity checking
+        arity = in.readInt();
+        xsize = in.readInt();
+        ysize = in.readInt();
+        zsize = in.readInt();
+        data = new short[in.readInt()];
+        for (int i = 0; i < data.length; i++)
+            data[i] = in.readShort();
     }
 
     public @JRubyMethod IRubyObject xsize() { return getRuntime().newFixnum(xsize); }
@@ -126,105 +192,5 @@ public class RubyTable extends RubyObject {
             i = i*xsize + x;
         }
         data[i] = (short) RubyNumeric.num2long(obj);
-    }
-
-    @JRubyMethod(name = "==")
-    @Override
-    public IRubyObject op_equal(ThreadContext context, IRubyObject other) {
-        Ruby runtime = context.runtime;
-        if (this == other) return runtime.getTrue();
-        if (other instanceof RubyTable table)
-            return runtime.newBoolean(arity == table.arity && xsize == table.xsize && ysize == table.ysize && zsize == table.zsize && Arrays.equals(data, table.data));
-        return runtime.getFalse();
-    }
-
-    @JRubyMethod(name = "eql?")
-    @Override
-    public IRubyObject eql_p(IRubyObject other) {
-        return op_equal(getRuntime().getCurrentContext(), other);
-    }
-
-    @JRubyMethod
-    @Override
-    public RubyFixnum hash() {
-        int h = 1;
-        h = h*31 + arity;
-        h = h*31 + xsize;
-        h = h*31 + ysize;
-        h = h*31 + zsize;
-        h = h*31 + Arrays.hashCode(data);
-        return getRuntime().newFixnum(h);
-    }
-
-    @JRubyMethod
-    @Override
-    public IRubyObject to_s() {
-        StringBuilder sb = new StringBuilder();
-        if (arity == 1)
-            appendX(sb, 0, 0, "");
-        else if (arity == 2)
-            appendY(sb, 0, "");
-        else
-            appendZ(sb, "");
-        return RubyString.newString(getRuntime(), sb);
-    }
-
-    private void appendZ(StringBuilder sb, String margin) {
-        sb.append("(");
-        for (int z = 0; z < zsize; z++) {
-            if (z > 0)
-                sb.append(",\n\n").append(margin).append(" ");
-            appendY(sb, z, margin + " ");
-        }
-        sb.append(")");
-    }
-
-    private void appendY(StringBuilder sb, int z, String margin) {
-        sb.append("(");
-        for (int y = 0; y < ysize; y++) {
-            if (y > 0)
-                sb.append(",\n").append(margin).append(" ");
-            appendX(sb, z, y, margin + " ");
-        }
-        sb.append(")");
-    }
-
-    private void appendX(StringBuilder sb, int z, int y, String margin) {
-        sb.append("(");
-        for (int x = 0; x < xsize; x++) {
-            if (x > 0)
-                sb.append(", ");
-            sb.append(data[x + xsize*(y + ysize*z)]);
-        }
-        sb.append(")");
-    }
-
-    @JRubyMethod
-    public IRubyObject _dump(IRubyObject arg) {
-        ByteBuffer buf = ByteBuffer.allocate(Integer.BYTES*5 + Short.BYTES*data.length).order(ByteOrder.LITTLE_ENDIAN);
-        buf.putInt(arity);
-        buf.putInt(xsize);
-        buf.putInt(ysize);
-        buf.putInt(zsize);
-        buf.putInt(data.length);
-        for (short val : data)
-            buf.putShort(val);
-        return getRuntime().newString(new ByteList(buf.array(), false));
-    }
-
-    @JRubyMethod(meta = true)
-    public static IRubyObject _load(IRubyObject recv, IRubyObject obj) {
-        ByteList byteList = obj.convertToString().getByteList();
-        ByteBuffer buf = ByteBuffer.wrap(byteList.getUnsafeBytes(), byteList.getBegin(), byteList.getRealSize()).order(ByteOrder.LITTLE_ENDIAN);
-        RubyTable table = (RubyTable) ((RubyClass) recv).allocate();
-        //TODO: sanity checking
-        table.arity = buf.getInt();
-        table.xsize = buf.getInt();
-        table.ysize = buf.getInt();
-        table.zsize = buf.getInt();
-        table.data = new short[buf.getInt()];
-        for (int i = 0; i < table.data.length; i++)
-            table.data[i] = buf.getShort();
-        return table;
     }
 }

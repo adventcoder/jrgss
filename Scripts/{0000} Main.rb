@@ -1,4 +1,5 @@
 
+
 len = 0
 loop do
     Graphics.update
