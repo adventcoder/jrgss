@@ -6,6 +6,7 @@ import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
+import org.jruby.RubyObject;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.GlobalVariable.Scope;
 import org.jruby.javasupport.JavaObject;
@@ -86,26 +87,34 @@ public class RubySupport {
         return val;
     }
 
-    // Type Checking
+    // Type Checking/Conversion
+
+    public static IRubyObject convertType(IRubyObject obj, RubyClass target) {
+        // we don't actually do any conversion but the error messages shown is 'can't convert X into Y'
+        if (target.isInstance(obj)) return obj;
+        throw newTypeConversionError(obj, target);
+    }
 
     public static RubyRect asRect(IRubyObject obj) {
-        if (obj instanceof RubyRect) return (RubyRect) obj;
-        throw newTypeConversionError(obj, Rect);
+        return (RubyRect) convertType(obj, Rect);
     }
 
     public static RubyColor asColor(IRubyObject obj) {
-        if (obj instanceof RubyColor) return (RubyColor) obj;
-        throw newTypeConversionError(obj, Color);
+        return (RubyColor) convertType(obj, Color);
     }
 
     public static RubyBitmap asBitmap(IRubyObject obj) {
-        if (obj instanceof RubyBitmap) return (RubyBitmap) obj;
-        throw newTypeConversionError(obj, Bitmap);
+        return (RubyBitmap) convertType(obj, Bitmap);
     }
 
     public static RubyFont asFont(IRubyObject obj) {
-        if (obj instanceof RubyFont) return (RubyFont) obj;
-        throw newTypeConversionError(obj, Font);
+        return (RubyFont) convertType(obj, Font);
+    }
+
+    public static <T extends RubyObject> T checkType(IRubyObject obj, Class<T> javaClass) {
+        if (javaClass.isAssignableFrom(obj.getClass()))
+            return javaClass.cast(obj);
+        throw obj.getRuntime().newTypeError(obj, "Data");
     }
 
     // Errors

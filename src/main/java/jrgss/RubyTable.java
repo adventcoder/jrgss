@@ -118,15 +118,12 @@ public class RubyTable extends RubyData {
     @Override
     public IRubyObject initialize_copy(IRubyObject obj) {
         if (obj == this) return this;
-        if (obj instanceof RubyTable table) {
-            this.arity = table.arity;
-            this.xsize = table.xsize;
-            this.ysize = table.ysize;
-            this.zsize = table.zsize;
-            this.data = table.data.clone();
-        } else {
-            throw getRuntime().newTypeError(obj, RubySupport.Table);
-        }
+        RubyTable table = RubySupport.checkType(obj, RubyTable.class);
+        this.arity = table.arity;
+        this.xsize = table.xsize;
+        this.ysize = table.ysize;
+        this.zsize = table.zsize;
+        this.data = table.data.clone();
         return this;
     }
 

@@ -168,14 +168,11 @@ public class RubyRect extends RubyData {
     }
 
     private IRubyObject set(IRubyObject obj) {
-        if (obj instanceof RubyRect rect) {
-            this.x = rect.x;
-            this.y = rect.y;
-            this.width = rect.width;
-            this.height = rect.height;
-        } else {
-            throw obj.getRuntime().newTypeError(obj, RubySupport.Rect);
-        }
+        RubyRect rect = RubySupport.checkType(obj, RubyRect.class);
+        this.x = rect.x;
+        this.y = rect.y;
+        this.width = rect.width;
+        this.height = rect.height;
         return this;
     }
 

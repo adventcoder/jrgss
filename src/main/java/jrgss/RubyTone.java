@@ -134,15 +134,11 @@ public class RubyTone extends RubyData {
     }
 
     private IRubyObject set(IRubyObject obj) {
-        if (obj == this) return this;
-        if (obj instanceof RubyTone tone) {
-            this.red = tone.red;
-            this.green = tone.green;
-            this.blue = tone.blue;
-            this.gray = tone.gray;
-        } else {
-            throw obj.getRuntime().newTypeError(obj, RubySupport.Tone);
-        }
+        RubyTone tone = RubySupport.checkType(obj, RubyTone.class);
+        this.red = tone.red;
+        this.green = tone.green;
+        this.blue = tone.blue;
+        this.gray = tone.gray;
         return this;
     }
 

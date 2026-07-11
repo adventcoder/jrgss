@@ -76,6 +76,12 @@ public class RubyFont extends RubyObject {
         this(runtime, metaClass, true);
     }
 
+    public static RubyFont newFont(Ruby runtime) {
+        RubyFont font = new RubyFont(runtime, RubySupport.Font);
+        font.set(getDefaultFont(RubySupport.Font));
+        return font;
+    }
+
     @JRubyMethod
     public IRubyObject name() {
         return name;
@@ -170,11 +176,7 @@ public class RubyFont extends RubyObject {
     @Override
     public IRubyObject initialize_copy(IRubyObject obj) {
         if (obj == this) return this;
-        if (obj instanceof RubyFont font) {
-            set(font);
-        } else {
-            throw getRuntime().newTypeError(obj, RubySupport.Font);
-        }
+        set(RubySupport.checkType(obj, RubyFont.class));
         return this;
     }
 

@@ -170,15 +170,11 @@ public class RubyColor extends RubyData {
     }
 
     private IRubyObject set(IRubyObject obj) {
-        if (obj == this) return this;
-        if (obj instanceof RubyColor color) {
-            this.red = color.red;
-            this.green = color.green;
-            this.blue = color.blue;
-            this.alpha = color.alpha;
-        } else {
-            throw obj.getRuntime().newTypeError(obj, RubySupport.Color);
-        }
+        RubyColor color = RubySupport.checkType(obj, RubyColor.class);
+        this.red = color.red;
+        this.green = color.green;
+        this.blue = color.blue;
+        this.alpha = color.alpha;
         return this;
     }
 
