@@ -36,8 +36,8 @@ public class RubyFont extends RubyObject {
         return font;
     }
 
-    private static RubyFont getDefaultFont(IRubyObject recv) {
-        return (RubyFont) ((RubyClass) recv).getInternalVariable("defaultFont");
+    private static RubyFont getDefaultFont(IRubyObject fontClass) {
+        return (RubyFont) ((RubyClass) fontClass).getInternalVariable("defaultFont");
     }
 
     public static @JRubyMethod(meta = true) IRubyObject default_name(IRubyObject recv) { return getDefaultFont(recv).name(); }

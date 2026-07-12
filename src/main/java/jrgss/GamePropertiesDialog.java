@@ -19,51 +19,63 @@ import javax.swing.KeyStroke;
 import javax.swing.border.EmptyBorder;
 
 public class GamePropertiesDialog extends JDialog {
-    private final JCheckBox fullscreenBox;
-    private final JCheckBox musicBox;
-    private final JCheckBox soundsBox;
+    private final GameProperties properties;
 
-    public GamePropertiesDialog(Frame owner) {
-        super(owner, "Game Properties", true);
+    private JCheckBox fullScreenBox;
+    private JCheckBox musicBox;
+    private JCheckBox soundBox;
 
-        // GameProperties props = new GameProperties.load();
+    public GamePropertiesDialog(Frame frame, GameProperties properties) {
+        super(frame, "Game Properties", true);
+        this.properties = properties;
 
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBorder(new EmptyBorder(6, 6, 6, 6));
+        setResizable(false);
+
+        buildUI();
+        pack();
+        setLocationRelativeTo(frame);
+    }
+
+    private void buildUI() {
+        JPanel contentPane = new JPanel(new BorderLayout());
+        contentPane.setBorder(new EmptyBorder(6, 6, 6, 6));
 
         JTabbedPane tabs = new JTabbedPane();
 
-        JPanel general = new JPanel(new BorderLayout());
-        general.setOpaque(false);
-        general.setPreferredSize(new Dimension(320, 210));
-        general.setBorder(new EmptyBorder(12, 12, 12, 12));
-        general.setLayout(new BoxLayout(general, BoxLayout.Y_AXIS));
+        JPanel generalTab = new JPanel(new BorderLayout());
+        generalTab.setOpaque(false);
+        generalTab.setPreferredSize(new Dimension(320, 210));
+        generalTab.setBorder(new EmptyBorder(12, 12, 12, 12));
+        generalTab.setLayout(new BoxLayout(generalTab, BoxLayout.Y_AXIS));
 
-        fullscreenBox = new JCheckBox("Launch in Fullscreen");
-        fullscreenBox.setAlignmentX(Component.LEFT_ALIGNMENT);
-        fullscreenBox.setOpaque(false);
+        fullScreenBox = new JCheckBox("Launch in Full Screen");
+        fullScreenBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+        fullScreenBox.setOpaque(false);
+        fullScreenBox.setSelected(properties.launchInFullScreen);
 
-        musicBox = new JCheckBox("Play Music");
+        musicBox = new JCheckBox("Play BGM and ME");
         musicBox.setAlignmentX(Component.LEFT_ALIGNMENT);
         musicBox.setOpaque(false);
+        musicBox.setSelected(properties.playMusic);
 
-        soundsBox = new JCheckBox("Play Sounds");
-        soundsBox.setAlignmentX(Component.LEFT_ALIGNMENT);
-        soundsBox.setOpaque(false);
+        soundBox = new JCheckBox("Play BGS and SE");
+        soundBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+        soundBox.setOpaque(false);
+        soundBox.setSelected(properties.playSound);
 
-        general.add(fullscreenBox);
-        general.add(Box.createVerticalStrut(6));
-        general.add(musicBox);
-        general.add(Box.createVerticalStrut(6));
-        general.add(soundsBox);
+        generalTab.add(fullScreenBox);
+        generalTab.add(Box.createVerticalStrut(6));
+        generalTab.add(musicBox);
+        generalTab.add(Box.createVerticalStrut(6));
+        generalTab.add(soundBox);
 
-        tabs.addTab("General", general);
+        tabs.addTab("General", generalTab);
 
-        JPanel keyboard = new JPanel(new BorderLayout());
-        keyboard.setOpaque(false);
-        tabs.addTab("Keyboard", keyboard);
+        JPanel keyboardTab = new JPanel(new BorderLayout());
+        keyboardTab.setOpaque(false);
+        tabs.addTab("Keyboard", keyboardTab);
 
-        root.add(tabs, BorderLayout.CENTER);
+        contentPane.add(tabs, BorderLayout.CENTER);
 
         //
         // Buttons
@@ -72,12 +84,12 @@ public class GamePropertiesDialog extends JDialog {
         JButton cancelButton = new JButton("Cancel");
 
         okButton.addActionListener(e -> {
-            System.out.println("fullscreen: " + fullscreenBox.isSelected());
-            System.out.println("music: " + musicBox.isSelected());
-            System.out.println("sounds: " + soundsBox.isSelected());
+            properties.launchInFullScreen = fullScreenBox.isSelected();
+            properties.playMusic = musicBox.isSelected();
+            properties.playSound = soundBox.isSelected();
+            properties.apply(false);
+            properties.save();
 
-            // props.apply();
-            // props.save();
             dispose();
         });
 
@@ -87,7 +99,9 @@ public class GamePropertiesDialog extends JDialog {
         buttons.add(okButton);
         buttons.add(cancelButton);
 
-        root.add(buttons, BorderLayout.SOUTH);
+        contentPane.add(buttons, BorderLayout.SOUTH);
+
+        setContentPane(contentPane);
 
         //
         // Enter = OK
@@ -101,10 +115,5 @@ public class GamePropertiesDialog extends JDialog {
                 e -> dispose(),
                 KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
                 JComponent.WHEN_IN_FOCUSED_WINDOW);
-
-        setContentPane(root);
-        setResizable(false);
-        pack();
-        setLocationRelativeTo(owner);
     }
 }

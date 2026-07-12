@@ -74,12 +74,12 @@ public class RTP {
         return null;
     }
 
-    public static String getInstalledPath(String rtpName) {
+    public static String getInstallPath(String rtpName) {
         Preferences rtpNode = Preferences.systemRoot().node("jrgss/rtp");
         return rtpNode.get(rtpName, null);
     }
 
-    public static void setInstalledPath(String rtpName, String rtpPath) throws BackingStoreException {
+    public static void setInstallPath(String rtpName, String rtpPath) throws BackingStoreException {
         Preferences rtpNode = Preferences.systemRoot().node("jrgss/rtp");
         rtpNode.put(rtpName, rtpPath);
         rtpNode.flush();
@@ -90,16 +90,16 @@ public class RTP {
         public static void main(String[] args) throws Exception {
             String libName = "RGSS3";
             String rtpName = "RPGVXAce";
-            String rtpPath = getEnterbrainInstalledPath(libName, rtpName);
+            String rtpPath = getEnterbrainInstallPath(libName, rtpName);
             if (rtpPath == null) {
                 System.err.println("ERROR: " + rtpName + " RTP not installed for " + libName);
                 System.exit(1);
             }
             System.out.println("Found RTP: " + rtpPath);
-            setInstalledPath(rtpName, rtpPath);
+            setInstallPath(rtpName, rtpPath);
         }
 
-        private static String getEnterbrainInstalledPath(String libName, String rtpName) throws IOException {
+        private static String getEnterbrainInstallPath(String libName, String rtpName) throws IOException {
             Process process = new ProcessBuilder("reg", "query", "HKLM\\SOFTWARE\\Enterbrain\\" + libName + "\\RTP", "/v", rtpName, "/reg:32").start();
             
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
@@ -119,7 +119,7 @@ public class RTP {
     public static class Linux {
         public static void main(String[] args) throws Exception {
             String rtpName = "RPGVXAce";
-            setInstalledPath(rtpName, System.getProperty("user.home") + "/.local/share/jrgss/" + rtpName);
+            setInstallPath(rtpName, System.getProperty("user.home") + "/.local/share/jrgss/" + rtpName);
         }
     }
 }

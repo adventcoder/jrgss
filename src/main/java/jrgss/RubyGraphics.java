@@ -25,12 +25,14 @@ public class RubyGraphics {
     private static long frameStartTime;
     private static int fps;
     private static long totalFrameTime;
+    // private static GraphicsBatch batch;
 
-    static {
+    public static void init() {
         reset();
     }
 
     public static void reset() {
+        // batch.clear(); // dispose all sprites
         frameRate = 60;
         frameCount = 0;
         frameStartTime = System.nanoTime();
@@ -72,17 +74,14 @@ public class RubyGraphics {
         return recv.getRuntime().newFixnum(game.getHeight());
     }
 
+    //TODO: somtimes this breaks rendering... also need to clamp width/height
     @JRubyMethod(meta = true)
     public static void resize_screen(IRubyObject recv, IRubyObject arg0, IRubyObject arg1) throws InterruptedException, InvocationTargetException {
         Game game = RubySupport.getGame(recv.getRuntime());
         int width = RubyNumeric.num2int(arg0);
         int height = RubyNumeric.num2int(arg1);
-        //TODO: somtimes this breaks rendering... also need to clamp width/height
-        EventQueue.invokeAndWait(() -> {
-            game.setPreferredSize(new Dimension(width, height));
-            game.frame.repack();
-            game.createBufferStrategy(2);
-        });
+        game.setPreferredSize(new Dimension(width, height));
+        EventQueue.invokeAndWait(() -> game.frame.repack());
     }
 
     @JRubyMethod(meta = true)
@@ -125,7 +124,7 @@ public class RubyGraphics {
     }
 
     private static void endFrame(Game game) throws InterruptedException {
-        render(game.getBufferStrategy());
+        renderToScreen(game);
 
         long desiredFrameTime = 1000_000_000L / frameRate;
         long frameTime = System.nanoTime() - frameStartTime;
@@ -157,7 +156,12 @@ public class RubyGraphics {
         }
     }
 
-    public static void render(BufferStrategy bs) {
+    public static void renderToScreen(Game game) {
+        BufferStrategy bs = game.getBufferStrategy();
+        if (bs == null) {
+            game.createBufferStrategy(2);
+            bs = game.getBufferStrategy();
+        }
         Graphics2D g = (Graphics2D) bs.getDrawGraphics();
         try {
             render(g);
@@ -168,6 +172,7 @@ public class RubyGraphics {
     }
 
     public static void render(Graphics2D g) {
+        // list.render();
         g.setColor(Color.getHSBColor(frameCount % 360 / 360.0f, 1.0f, 1.0f));
         g.fillOval(0, 0, 544, 416);
     }

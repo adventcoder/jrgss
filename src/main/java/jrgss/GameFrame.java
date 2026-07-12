@@ -17,11 +17,11 @@ public class GameFrame extends Frame {
 
     private ReentrantLock activeLock = new ReentrantLock();
     private Condition activated = activeLock.newCondition();
-    private @Getter boolean active = false;
+    private boolean active = false;
 
     private ReentrantLock openLock = new ReentrantLock();
     private Condition opened = openLock.newCondition();
-    private @Getter boolean open = false;
+    private boolean open = false;
 
     public GameFrame(Game game) {
         this.game = game;
@@ -38,17 +38,6 @@ public class GameFrame extends Frame {
 
         addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosing(WindowEvent e) {
-                // if (graceful) {
-                //     game.shutdown();
-                //     game.awaitTermination() // must wait before disposing self or the game could access the disposed ui
-                //     dispose();
-                // } else {
-                System.exit(0);
-                // }
-            }
-
-            @Override
             public void windowOpened(WindowEvent e) {
                 openLock.lock();
                 try {
@@ -60,13 +49,14 @@ public class GameFrame extends Frame {
             }
 
             @Override
+            public void windowClosing(WindowEvent e) {
+                // this can cause exceptions if the game thread tries to render before the window is closed but idk how to stop the game thread from here
+                dispose();
+            }
+
+            @Override
             public void windowClosed(WindowEvent e) {
-                openLock.lock();
-                try {
-                    open = false;
-                } finally {
-                    openLock.unlock();
-                }
+                System.exit(0);
             }
 
             @Override

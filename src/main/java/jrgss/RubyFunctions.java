@@ -34,7 +34,8 @@ public class RubyFunctions {
                 block.call(context);
             } catch (RaiseException ex) {
                 if (RubySupport.RGSSReset.isInstance(ex.getException())) {
-                    // TODO: reset handling goes here!
+                    Game game = RubySupport.getGame(context.runtime);
+                    game.rgssReset();
                     return context.nil; // continue loop
                 } else {
                     throw ex;

@@ -9,13 +9,18 @@ import org.jruby.RubyNumeric;
 import org.jruby.RubyObject;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.GlobalVariable.Scope;
-import org.jruby.javasupport.JavaObject;
+import org.jruby.internal.runtime.ValueAccessor;
+import org.jruby.javasupport.JavaEmbedUtils;
 import org.jruby.runtime.builtin.IRubyObject;
 
 import lombok.experimental.UtilityClass;
 
 @UtilityClass
 public class RubySupport {
+    //TODO: All this state should be per runtime...
+
+    public static Game game;
+
     public static RubyClass RGSSError;
     public static RubyClass RGSSReset;
 
@@ -31,14 +36,8 @@ public class RubySupport {
     public static RubyModule Input;
     public static RubyModule Audio;
 
-    public static void setGame(Ruby runtime, Game game) {
-        runtime.defineReadonlyVariable("$__GAME__", JavaObject.wrap(runtime, game), Scope.GLOBAL);
-    }
-
     public static Game getGame(Ruby runtime) {
-        IRubyObject gameObj = runtime.getGlobalVariables().get("$__GAME__");
-        if (gameObj.isNil()) return null;
-        return (Game) ((JavaObject) gameObj).getValue();
+        return game;
     }
 
     public static void bootstrap(Ruby runtime) {
@@ -62,6 +61,11 @@ public class RubySupport {
 
     private static RubyClass defineSubclass(String name, RubyClass superClass) {
         return superClass.getRuntime().defineClass(name, superClass, superClass.getAllocator());
+    }
+
+    public static void setGlobalVariable(Ruby runtime, String name, Object obj) {
+        IRubyObject rubyObj = JavaEmbedUtils.javaToRuby(runtime, obj);
+        runtime.getGlobalVariables().define(name, new ValueAccessor(rubyObj), Scope.GLOBAL);
     }
 
     // Argument Checking
