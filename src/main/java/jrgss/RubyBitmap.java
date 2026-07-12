@@ -454,13 +454,13 @@ public class RubyBitmap extends RubyObject {
     public void radial_blur(IRubyObject arg0, IRubyObject arg1) {
         checkDisposed();
         int amplitude = RubyNumeric.num2int(arg0);
-        int divisions = RubySupport.numToIntInRangeClamped(arg1, 2, 100);
+        int division = RubySupport.numToIntInRangeClamped(arg1, 2, 100);
         if (amplitude <= 0) return;
 
         //NOTE: we could cache the temp raster
         WritableRaster tempRaster = image.getRaster().createCompatibleWritableRaster();
         image.copyData(tempRaster);
-        RasterOps.radialBlur(tempRaster, image.getRaster(), amplitude, divisions);
+        RasterOps.radialBlur(tempRaster, image.getRaster(), amplitude, division);
     }
 
     @JRubyMethod(required = 1, optional = 2)

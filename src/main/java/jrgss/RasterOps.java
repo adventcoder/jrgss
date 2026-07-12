@@ -8,9 +8,9 @@ import java.util.Arrays;
 //TODO: we should grab pixels one scanline at a time rather than one pixel at a time, this would eliminate the need for a scratch buffer for blurX/blurY
 public class RasterOps {
     public static void blurX(Raster src, WritableRaster dst, int radius) {
-        double weight = 1.0f / (2*radius + 1);
+        float weight = 1.0f / (2*radius + 1);
         int[] pixel = new int[src.getNumBands()];
-        double newPixel[] = new double[pixel.length];
+        float newPixel[] = new float[pixel.length];
 
         for (int y = 0; y < dst.getHeight(); y++) {
             Arrays.fill(newPixel, 0.0f);
@@ -35,9 +35,9 @@ public class RasterOps {
     }
 
     public static void blurY(Raster src, WritableRaster dst, int radius) {
-        double weight = 1.0f / (2*radius + 1);
+        float weight = 1.0f / (2*radius + 1);
         int[] pixel = new int[src.getNumBands()];
-        double newPixel[] = new double[pixel.length];
+        float newPixel[] = new float[pixel.length];
 
         for (int x = 0; x < dst.getWidth(); x++) {
             Arrays.fill(newPixel, 0.0f);
@@ -61,32 +61,33 @@ public class RasterOps {
         }
     }
 
-    public static void radialBlur(Raster src, WritableRaster dst, int amplitude, int divisions) {
-        double originX = src.getWidth() * 0.5;
-        double originY = src.getHeight() * 0.5;
-        double weight = 1.0 / divisions;
+    public static void radialBlur(Raster src, WritableRaster dst, int amplitude, int division) {
+        float originX = src.getWidth() * 0.5f;
+        float originY = src.getHeight() * 0.5f;
+        float weight = 1.0f / division;
 
-        double[] cos = new double[divisions];
-        double[] sin = new double[divisions];
-        for (int d = 0; d < divisions; d++) {
-            double t = ((double) d) / (divisions - 1);
+        float[] cos = new float[division];
+        float[] sin = new float[division];
+        // split evenly from -amplitude/2 -> amplitude/2 including both endpoints
+        for (int d = 0; d < division; d++) {
+            double t = ((double) d) / (division - 1);
             double rads = Math.toRadians(amplitude * (t - 0.5));
-            cos[d] = Math.cos(rads);
-            sin[d] = Math.sin(rads);
+            cos[d] = (float) Math.cos(rads);
+            sin[d] = (float) Math.sin(rads);
         }
 
         int[] pixel = new int[src.getNumBands()];
-        double newPixel[] = new double[pixel.length];
+        float newPixel[] = new float[pixel.length];
 
         for (int y = 0; y < dst.getHeight(); y++) {
             for (int x = 0; x < dst.getWidth(); x++) {
-                Arrays.fill(newPixel, 0.0);
+                Arrays.fill(newPixel, 0.0f);
 
-                double dx = x + 0.5 - originX;
-                double dy = y + 0.5 - originY;
-                for (int d = 0; d < divisions; d++) {
-                    double newX = dx*cos[d] - dy*sin[d] + originX;
-                    double newY = dx*sin[d] + dy*cos[d] + originY;
+                float dx = x + 0.5f - originX;
+                float dy = y + 0.5f - originY;
+                for (int d = 0; d < division; d++) {
+                    float newX = dx*cos[d] - dy*sin[d] + originX;
+                    float newY = dx*sin[d] + dy*cos[d] + originY;
 
                     samplePixel(src, newX, newY, pixel);
                     for (int i = 0; i < pixel.length; i++)
