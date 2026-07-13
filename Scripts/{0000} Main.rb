@@ -1,15 +1,10 @@
 
+Audio.bgm_play('Audio/BGM/Airship')
 
-len = 0
 loop do
     Graphics.update
     Input.update
-    print("\r")
-    print(' ' * len)
-    s = Input.pressed.inspect
-    print("\r")
-    print(s)
-    len = s.size
+    puts(Audio.bgm_pos)
     if Input.trigger?(:B)
         msgbox("hoy")
     elsif Input.trigger?(:C)

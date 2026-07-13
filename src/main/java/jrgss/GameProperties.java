@@ -14,7 +14,7 @@ public class GameProperties {
     public static final boolean defaultPlayMusic = true;
     public static final boolean defaultPlaySound = true;
     public static final byte[] defaultButtonAssign = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        RubyInput.A, RubyInput.B, RubyInput.C, RubyInput.X, RubyInput.Y, RubyInput.Z, RubyInput.L, RubyInput.R, 0, 0,
         RubyInput.C, RubyInput.C, RubyInput.B, RubyInput.B, RubyInput.A,
         RubyInput.C, RubyInput.B, 0, 0, 0,
         RubyInput.X, RubyInput.Y, RubyInput.Z,

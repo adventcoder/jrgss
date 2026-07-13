@@ -1,4 +1,4 @@
-Audio.bgm_play('Audio/BGM/Airship')
+Audio.bgm_play('Audio/BGM/Airship', 100, 150, 0)
 
 weather = ['Rain', 'Wind', 'Storm']
 weather_index = 0

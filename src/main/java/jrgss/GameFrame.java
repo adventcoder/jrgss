@@ -50,7 +50,7 @@ public class GameFrame extends Frame {
 
             @Override
             public void windowClosing(WindowEvent e) {
-                // this can cause exceptions if the game thread tries to render before the window is closed but idk how to stop the game thread from here
+                //TODO: we should tell the game thread to stop and let that handle cleanup
                 dispose();
             }
 
