@@ -10,6 +10,8 @@ import javax.sound.sampled.BooleanControl;
 import javax.sound.sampled.Clip;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.FloatControl;
+import javax.sound.sampled.LineEvent;
+import javax.sound.sampled.LineListener;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
@@ -21,21 +23,36 @@ import org.jruby.runtime.builtin.IRubyObject;
 
 import com.github.trilarion.sound.vorbis.sampled.spi.VorbisAudioFileReader;
 
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
-//TODO: integrate with game properties playMusic/playSound on/off
 //TODO: midi support? (probably don't care about this)
 @RequiredArgsConstructor
-public class RubyAudio {
+public class RubyAudio implements LineListener {
     public static void createAudioModule(Ruby runtime) {
         RubyModule mod = runtime.defineModule("Audio");
         RubySupport.Audio = mod;
         mod.defineAnnotatedMethods(RubyAudio.class);
     }
 
-    private static float linearToDb(float val) {
-        return 20f * (float) Math.log10(val);
+    //TODO: do we need these static properties or should we get directly from game properties (probably we should)
+    private static boolean musicMuted;
+    private static boolean soundMuted;
+
+    public static void setMusicMuted(boolean muted) {
+        musicMuted = muted;
+        bgm.updateMuted();
+        me.updateMuted();
+    }
+
+    public static void setSoundMuted(boolean muted) {
+        soundMuted = muted;
+        bgs.updateMuted();
+        se.updateMuted();
+    }
+
+    private static float linearToDb(int volume) {
+        if (volume == 0) return Float.NEGATIVE_INFINITY;
+        return 20 * (float) Math.log10(volume / 100f);
     }
 
     public enum Type {
@@ -52,73 +69,91 @@ public class RubyAudio {
         public boolean isSound() {
             return this == BGS || this == SE;
         }
+
+        public boolean isMuted() {
+            if (isMusic()) return musicMuted;
+            if (isSound()) return soundMuted;
+            return false;
+        }
     }
 
-    private final @NonNull Type type;
+    private final Type type;
     private Clip clip;
     private File clipFile;
     private long frameOffset;
+    private boolean paused;
+    private boolean running; // whether audio should be playing irrespective of current pause state
 
     public void play(File file, int volume, int pitch, int pos) throws IOException, UnsupportedAudioFileException, LineUnavailableException {
+        // TODO: should we always stop here? RGSS continues playing but still applies volume and pitch adjustments if the file is the same
+        // it also just ignores position... sometimes? needs more testing
+        // this would prevent music effects pausing the bgm and restarting it briefly
         stop();
 
-        //TODO: pitch adjustment, we will have to create a new clip with the source sample rate adjusted
-
-        if (clip == null || !file.equals(clipFile)) { // we need to create a new clip
-            if (clip != null)
-                clip.close();
-
-            AudioInputStream source = AudioSystem.getAudioInputStream(file);
-            try {
-                AudioFormat sourceFormat = source.getFormat();
-                if (source.getFormat().getEncoding().equals(VorbisAudioFileReader.VORBISENC)) {
-                    // vorbis decodes to 16 bit signed pcm samples (TODO: seems to be little endian? is this platform dependent?)
-                    // retain sample rate and channels from source
-                    sourceFormat = new AudioFormat(sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), true, false);
-                    source = AudioSystem.getAudioInputStream(sourceFormat, source);
-                }
-
-                clip = (Clip) AudioSystem.getLine(new DataLine.Info(Clip.class, sourceFormat));
-                clip.open(source);
-                clipFile = file;
-
-                //TODO: need to extract these for ogg files
-                // clip.setLoopPoints(loopStart, loopEnd);
-            } finally {
-                source.close();
-            }
+        if (clip == null || !file.equals(clipFile)) { // different file we need to load a new clip
+            closeClip();
+            openClip(file);
         }
 
-        if (volume == 0) {
-            BooleanControl mute = (BooleanControl) clip.getControl(BooleanControl.Type.MUTE);
-            mute.setValue(true);
-        } else {
-            FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
-            gain.setValue(Math.min(Math.max(linearToDb(volume / 100f), gain.getMinimum()), gain.getMaximum()));
+        if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+            gainControl.setValue(Math.min(Math.max(linearToDb(volume), gainControl.getMinimum()), gainControl.getMaximum()));
         }
 
+        // this is likely not supported
+        if (clip.isControlSupported(FloatControl.Type.SAMPLE_RATE)) {
+            FloatControl sampleRateControl = (FloatControl) clip.getControl(FloatControl.Type.SAMPLE_RATE);
+            float baseSampleRate = clip.getFormat().getSampleRate();
+            sampleRateControl.setValue(baseSampleRate * pitch / 100f);
+        }
+
+        updateMuted();
+
+        // we shouldn't change position if the clip is currently running, only matters if we don't always call stop() at the beginning of this method
         int framePos = pos / clip.getFormat().getFrameSize();
         if (framePos < 0 || framePos >= clip.getFrameLength())
             framePos = 0;
-
         clip.setFramePosition(framePos);
         frameOffset = clip.getLongFramePosition() - framePos;
 
-        if (type.isLooping()) {
-            clip.loop(Clip.LOOP_CONTINUOUSLY);
-        } else {
-            clip.start();
-        }
+        start();
     }
 
-    public void stop() {
-        if (clip != null)
+    public synchronized void start() {
+        if (running) return;
+        running = true;
+        if (!paused)
+            clip.loop(type.isLooping() ? Clip.LOOP_CONTINUOUSLY : 0);
+    }
+
+    public synchronized void stop() {
+        if (!running) return;
+        running = false;
+        if (!paused)
             clip.stop();
     }
 
-    public void fade(long millis) {
-        //TODO: probably will have to spawn a thread for this
-        // how does stop/play interact?
+    public synchronized void pause() {
+        if (paused) return;
+        paused = true;
+        if (running)
+            clip.stop();
+    }
+
+    public synchronized void resume() {
+        if (!paused) return;
+        paused = false;
+        if (running)
+            clip.loop(type.isLooping() ? Clip.LOOP_CONTINUOUSLY : 0);
+    }
+
+    public void fade(int millis) {
+        if (clip == null) return;
+        if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+            // this is not linear, but it's not actually supported by java audio anyway, it just sets the target value
+            gain.shift(gain.getValue(), gain.getMinimum(), millis*1000);
+        }
     }
 
     public int pos() {
@@ -129,6 +164,57 @@ public class RubyAudio {
             framePos = framePos % clip.getFrameLength();
         }
         return (int) framePos * clip.getFormat().getFrameSize();
+    }
+
+    private void openClip(File file) throws UnsupportedAudioFileException, IOException, LineUnavailableException {
+        AudioInputStream source = AudioSystem.getAudioInputStream(file);
+        try {
+            AudioFormat sourceFormat = source.getFormat();
+            if (source.getFormat().getEncoding().equals(VorbisAudioFileReader.VORBISENC)) {
+                // vorbis spi decodes to 16 bit signed pcm samples (seems to be little endian)
+                // retain sample rate and channels from source
+                sourceFormat = new AudioFormat(sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), true, false);
+                source = AudioSystem.getAudioInputStream(sourceFormat, source);
+            }
+
+            clip = (Clip) AudioSystem.getLine(new DataLine.Info(Clip.class, sourceFormat));
+            clip.open(source);
+            if (type == Type.ME)
+                clip.addLineListener(this);
+            clipFile = file;
+
+            //TODO: need to extract loop points for ogg files
+            // clip.setLoopPoints(loopStart, loopEnd);
+        } finally {
+            source.close();
+        }
+    }
+
+    private void closeClip() {
+        if (clip != null) {
+            clip.removeLineListener(this);
+            clip.close();
+            clip = null;
+        }
+    }
+
+    @Override
+    public void update(LineEvent event) {
+        if (type == Type.ME) {
+            if (event.getType() == LineEvent.Type.START) {
+                bgm.pause();
+            } if (event.getType() == LineEvent.Type.STOP) {
+                bgm.resume();
+            }
+        }
+    }
+
+    private void updateMuted() {
+        if (clip == null) return;
+        if (clip.isControlSupported(BooleanControl.Type.MUTE)) {
+            BooleanControl muteControl = (BooleanControl) clip.getControl(BooleanControl.Type.MUTE);
+            muteControl.setValue(type.isMuted());
+        }
     }
 
     private static final RubyAudio bgm = new RubyAudio(Type.BGM);
@@ -153,7 +239,7 @@ public class RubyAudio {
 
     @JRubyMethod(meta = true)
     public static void bgm_fade(IRubyObject recv, IRubyObject arg0) {
-        bgm.fade(RubyNumeric.num2long(arg0));
+        bgm.fade(RubyNumeric.num2int(arg0));
     }
 
     @JRubyMethod(meta = true)
@@ -178,7 +264,7 @@ public class RubyAudio {
 
     @JRubyMethod(meta = true)
     public static void bgs_fade(IRubyObject recv, IRubyObject arg0) {
-        bgs.fade(RubyNumeric.num2long(arg0));
+        bgs.fade(RubyNumeric.num2int(arg0));
     }
 
     @JRubyMethod(meta = true)
@@ -192,20 +278,12 @@ public class RubyAudio {
         int volume = args.length >= 2 ? RubySupport.numToIntInRangeClamped(args[1], 0, 200) : 100;
         int pitch = args.length >= 3 ? RubySupport.numToIntInRangeClamped(args[2], 50, 150) : 100;
 
-        //TODO: bgm should stop temporarily and restart afterwards
-        // the bgm stops immediately but there is a fade in effect on restart
-        // I think this is implemented by stopping as we normally do, then restarting from the start of the track when the me completes
-        // need to test what happens if the bgm has been played/stopped in the meantime
-
-        //TODO: if the same me is played before the current finishes it resumes from the current position not from the start. (note no pos passed in for this method)
-        //      volume and pitch are adjusted
-        //      similar behavior for bgm/bgs - if file/volume/pitch are all the same the new pos is ignored and nothing happens
         me.play(file, volume, pitch, 0);
     }
 
     @JRubyMethod(meta = true)
     public static void me_fade(IRubyObject recv, IRubyObject arg0) {
-        me.fade(RubyNumeric.num2long(arg0));
+        me.fade(RubyNumeric.num2int(arg0));
     }
 
     @JRubyMethod(meta = true)

@@ -58,6 +58,8 @@ public class GameProperties {
 
     public void apply(boolean launch) {
         RubyInput.assignButtons(buttonAssign, keyCodeAssign);
+        RubyAudio.setMusicMuted(!playMusic);
+        RubyAudio.setSoundMuted(!playSound);
     }
 
     public static void main(String[] args) {
