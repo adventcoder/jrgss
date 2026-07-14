@@ -6,11 +6,11 @@ import java.io.IOException;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.BooleanControl;
 import javax.sound.sampled.Clip;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.FloatControl;
 import javax.sound.sampled.LineUnavailableException;
-import javax.sound.sampled.SourceDataLine;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 import org.jruby.Ruby;
@@ -19,8 +19,14 @@ import org.jruby.RubyNumeric;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.builtin.IRubyObject;
 
-import com.google.common.util.concurrent.Uninterruptibles;
+import com.github.trilarion.sound.vorbis.sampled.spi.VorbisAudioFileReader;
 
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
+
+//TODO: integrate with game properties playMusic/playSound on/off
+//TODO: midi support? (probably don't care about this)
+@RequiredArgsConstructor
 public class RubyAudio {
     public static void createAudioModule(Ruby runtime) {
         RubyModule mod = runtime.defineModule("Audio");
@@ -28,170 +34,116 @@ public class RubyAudio {
         mod.defineAnnotatedMethods(RubyAudio.class);
     }
 
-    private static AudioFormat playbackFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 44100, 16, 2, 4, 44100, false);
-    private static final float bufferTimeSeconds = 1.0f;
+    private static float linearToDb(float val) {
+        return 20f * (float) Math.log10(val);
+    }
 
-    private Thread thread;
-    private AudioInputStream inputStream;
-    private SourceDataLine line;
-    private FloatControl gainControl;
-    private FloatControl sampleRateControl;
+    public enum Type {
+        BGM, BGS, ME, SE;
+
+        public boolean isLooping() {
+            return this == BGM || this == BGS;
+        }
+
+        public boolean isMusic() {
+            return this == BGM || this == ME;
+        }
+
+        public boolean isSound() {
+            return this == BGS || this == SE;
+        }
+    }
+
+    private final @NonNull Type type;
+    private Clip clip;
+    private File clipFile;
     private long frameOffset;
-    private File loopFile = null;
-    private boolean opened = false;
-    private volatile boolean running = false;
 
-    private void open(File file, long pos) throws IOException, UnsupportedAudioFileException {
-        if (opened) throw new IllegalStateException("already opened");
+    public void play(File file, int volume, int pitch, int pos) throws IOException, UnsupportedAudioFileException, LineUnavailableException {
+        stop();
 
-        // open the audio file to read from
-        inputStream = AudioSystem.getAudioInputStream(file);
-        System.out.println(inputStream.getFormat().properties());
-        if (!inputStream.getFormat().matches(playbackFormat))
-            inputStream = AudioSystem.getAudioInputStream(playbackFormat, inputStream);
+        //TODO: pitch adjustment, we will have to create a new clip with the source sample rate adjusted
 
-        frameOffset = 0L;
-        if (pos > 0) {
-            inputStream.skip(pos);
-            frameOffset += pos;
-        }
+        if (clip == null || !file.equals(clipFile)) { // we need to create a new clip
+            if (clip != null)
+                clip.close();
 
-        // then get a data line to write to, we let java select the mixer.
-        // for now we get a new line every time instead of reusing, even if the format is the same.
-        try {
-            DataLine.Info lineInfo = new DataLine.Info(SourceDataLine.class, playbackFormat);
-            line = (SourceDataLine) AudioSystem.getLine(lineInfo);
-            line.open(playbackFormat);
-        } catch (LineUnavailableException ex) {
+            AudioInputStream source = AudioSystem.getAudioInputStream(file);
             try {
-                inputStream.close();
-            } catch (IOException ioe) {
-                ex.addSuppressed(ioe);
+                AudioFormat sourceFormat = source.getFormat();
+                if (source.getFormat().getEncoding().equals(VorbisAudioFileReader.VORBISENC)) {
+                    // vorbis decodes to 16 bit signed pcm samples (TODO: seems to be little endian? is this platform dependent?)
+                    // retain sample rate and channels from source
+                    sourceFormat = new AudioFormat(sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), true, false);
+                    source = AudioSystem.getAudioInputStream(sourceFormat, source);
+                }
+
+                clip = (Clip) AudioSystem.getLine(new DataLine.Info(Clip.class, sourceFormat));
+                clip.open(source);
+                clipFile = file;
+
+                //TODO: need to extract these for ogg files
+                // clip.setLoopPoints(loopStart, loopEnd);
+            } finally {
+                source.close();
             }
-            throw new IOException(ex);
         }
 
-        if (line.isControlSupported(FloatControl.Type.MASTER_GAIN))
-            gainControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-        if (line.isControlSupported(FloatControl.Type.SAMPLE_RATE))
-            sampleRateControl = (FloatControl) line.getControl(FloatControl.Type.SAMPLE_RATE);
-
-        this.opened = true;
-    }
-
-    public void close() throws IOException {
-        if (!opened) return;
-        if (running) throw new IllegalStateException("playback must be stopped before closing");
-        try {
-            inputStream.close();
-        } catch (IOException ioe) {
-            ioe.printStackTrace();
+        if (volume == 0) {
+            BooleanControl mute = (BooleanControl) clip.getControl(BooleanControl.Type.MUTE);
+            mute.setValue(true);
+        } else {
+            FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+            gain.setValue(Math.min(Math.max(linearToDb(volume / 100f), gain.getMinimum()), gain.getMaximum()));
         }
-        line.close();
-        line = null;
-        gainControl = null;
-        sampleRateControl = null;
-        inputStream = null;
-        opened = false;
-    }
 
-    public long pos() {
-        if (!opened) return 0L;
-        return line.getFramePosition() - frameOffset;
-    }
+        int framePos = pos / clip.getFormat().getFrameSize();
+        if (framePos < 0 || framePos >= clip.getFrameLength())
+            framePos = 0;
 
-    public void setVolume(int volume) {
-        if (gainControl == null) return;
-        //TODO
-    }
+        clip.setFramePosition(framePos);
+        frameOffset = clip.getLongFramePosition() - framePos;
 
-    public void setPitch(int pitch) {
-        if (sampleRateControl == null) return;
-        //TODO
-    }
-
-    public void start() {
-        if (!opened) throw new IllegalStateException("audio must be opened before playback can start");
-        if (running) return;
-        running = true;
-        thread = new Thread(this::audioLoop, getClass().getSimpleName() + "Thread");
-        thread.setDaemon(true);
-        thread.start();
+        if (type.isLooping()) {
+            clip.loop(Clip.LOOP_CONTINUOUSLY);
+        } else {
+            clip.start();
+        }
     }
 
     public void stop() {
-        if (!running) return;
-        running = false;
-        Uninterruptibles.joinUninterruptibly(thread);
-        thread = null;
+        if (clip != null)
+            clip.stop();
     }
 
     public void fade(long millis) {
-        if (!running) return;
-        //TODO
+        //TODO: probably will have to spawn a thread for this
+        // how does stop/play interact?
     }
 
-    private void audioLoop() {
-        try {
-            byte[] buffer = new byte[calculateBufferSize(playbackFormat)];
-
-            line.start();
-            try {
-                while (running) {
-                    int bytesRead = read(buffer);
-                    if (bytesRead == -1) break;
-                    if (bytesRead == 0) {
-                        Thread.yield();
-                        continue;
-                    }
-                    line.write(buffer, 0, bytesRead);
-                }
-            } finally {
-                line.stop();
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
+    public int pos() {
+        if (clip == null) return 0;
+        long framePos = clip.getFramePosition() - frameOffset;
+        if (type.isLooping()) {
+            // need to take into account loop start/end
+            framePos = framePos % clip.getFrameLength();
         }
+        return (int) framePos * clip.getFormat().getFrameSize();
     }
 
-    private static int calculateBufferSize(AudioFormat format) {
-        int frames = (int) Math.ceil(format.getFrameRate() * bufferTimeSeconds);
-        return frames * format.getFrameSize();
-    }
-
-    private int read(byte[] buffer) throws IOException, UnsupportedAudioFileException {
-        int bytesRead = inputStream.read(buffer);
-        if (bytesRead == -1 && loopFile != null) {
-            // line.drain();
-            // frameOffset = line.getLongFramePosition();
-
-            // inputStream.close();
-
-            // inputStream = AudioSystem.getAudioInputStream(loopFile);
-            // if (!inputStream.getFormat().matches(playbackFormat))
-            //     inputStream = AudioSystem.getAudioInputStream(playbackFormat, inputStream);
-
-            // bytesRead = inputStream.read(buffer);
-        }
-        return bytesRead;
-    }
-
-    private static RubyAudio bgm = new RubyAudio();
+    private static final RubyAudio bgm = new RubyAudio(Type.BGM);
+    private static final RubyAudio bgs = new RubyAudio(Type.BGS);
+    private static final RubyAudio me = new RubyAudio(Type.ME);
+    private static final RubyAudio se = new RubyAudio(Type.SE);
 
     @JRubyMethod(meta = true, required = 1, optional = 3)
-    public static void bgm_play(IRubyObject recv, IRubyObject... args) throws Exception {
+    public static void bgm_play(IRubyObject recv, IRubyObject... args) throws Exception { //TODO: exception handling
         File file = RTP.findFile(recv.getRuntime().getCurrentDirectory(), args[0].asJavaString());
-        int volume = args.length >= 2 ? RubyNumeric.num2int(args[1]) : 100;
-        int pitch = args.length >= 3 ? RubyNumeric.num2int(args[2]) : 100;
-        long pos = args.length >= 4 ? RubyNumeric.num2long(args[3]) : 0L;
+        int volume = args.length >= 2 ? RubySupport.numToIntInRangeClamped(args[1], 0, 200) : 100;
+        int pitch = args.length >= 3 ? RubySupport.numToIntInRangeClamped(args[2], 50, 150) : 100;
+        int pos = args.length >= 4 ? RubyNumeric.num2int(args[3]) : 0;
 
-        bgm.stop();
-        bgm.close();
-
-        bgm.open(file, pos);
-        bgm.setVolume(volume);
-        bgm.setPitch(pitch);
-        bgm.start();
+        bgm.play(file, volume, pitch, pos);
     }
 
     @JRubyMethod(meta = true)
@@ -207,5 +159,72 @@ public class RubyAudio {
     @JRubyMethod(meta = true)
     public static IRubyObject bgm_pos(IRubyObject recv) {
         return recv.getRuntime().newFixnum(bgm.pos());
+    }
+
+    @JRubyMethod(meta = true, required = 1, optional = 3)
+    public static void bgs_play(IRubyObject recv, IRubyObject... args) throws Exception { //TODO: exception handling
+        File file = RTP.findFile(recv.getRuntime().getCurrentDirectory(), args[0].asJavaString());
+        int volume = args.length >= 2 ? RubySupport.numToIntInRangeClamped(args[1], 0, 200) : 100;
+        int pitch = args.length >= 3 ? RubySupport.numToIntInRangeClamped(args[2], 50, 150) : 100;
+        int pos = args.length >= 4 ? RubyNumeric.num2int(args[3]) : 0;
+
+        bgs.play(file, volume, pitch, pos);
+    }
+
+    @JRubyMethod(meta = true)
+    public static void bgs_stop(IRubyObject recv) {
+        bgs.stop();
+    }
+
+    @JRubyMethod(meta = true)
+    public static void bgs_fade(IRubyObject recv, IRubyObject arg0) {
+        bgs.fade(RubyNumeric.num2long(arg0));
+    }
+
+    @JRubyMethod(meta = true)
+    public static IRubyObject bgs_pos(IRubyObject recv) {
+        return recv.getRuntime().newFixnum(bgs.pos());
+    }
+
+    @JRubyMethod(meta = true, required = 1, optional = 2)
+    public static void me_play(IRubyObject recv, IRubyObject... args) throws Exception { //TODO: exception handling
+        File file = RTP.findFile(recv.getRuntime().getCurrentDirectory(), args[0].asJavaString());
+        int volume = args.length >= 2 ? RubySupport.numToIntInRangeClamped(args[1], 0, 200) : 100;
+        int pitch = args.length >= 3 ? RubySupport.numToIntInRangeClamped(args[2], 50, 150) : 100;
+
+        //TODO: bgm should stop temporarily and restart afterwards
+        // the bgm stops immediately but there is a fade in effect on restart
+        // I think this is implemented by stopping as we normally do, then restarting from the start of the track when the me completes
+        // need to test what happens if the bgm has been played/stopped in the meantime
+
+        //TODO: if the same me is played before the current finishes it resumes from the current position not from the start. (note no pos passed in for this method)
+        //      volume and pitch are adjusted
+        //      similar behavior for bgm/bgs - if file/volume/pitch are all the same the new pos is ignored and nothing happens
+        me.play(file, volume, pitch, 0);
+    }
+
+    @JRubyMethod(meta = true)
+    public static void me_fade(IRubyObject recv, IRubyObject arg0) {
+        me.fade(RubyNumeric.num2long(arg0));
+    }
+
+    @JRubyMethod(meta = true)
+    public static void me_stop(IRubyObject recv) {
+        me.stop();
+    }
+
+   @JRubyMethod(meta = true, required = 1, optional = 2)
+    public static void se_play(IRubyObject recv, IRubyObject... args) throws Exception { //TODO: exception handling
+        File file = RTP.findFile(recv.getRuntime().getCurrentDirectory(), args[0].asJavaString());
+        int volume = args.length >= 2 ? RubySupport.numToIntInRangeClamped(args[1], 0, 200) : 100;
+        int pitch = args.length >= 3 ? RubySupport.numToIntInRangeClamped(args[2], 50, 150) : 100;
+
+        //TODO: multiple simultaneous sounds effects + filtering when the same sound is played rapidly
+        se.play(file, volume, pitch, 0);
+    }
+
+    @JRubyMethod(meta = true)
+    public static void se_stop(IRubyObject recv) {
+        se.stop();
     }
 }

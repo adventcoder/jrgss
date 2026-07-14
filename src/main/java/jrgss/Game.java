@@ -18,9 +18,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,11 +42,7 @@ import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyNumeric;
 import org.jruby.RubySystemExit;
 import org.jruby.exceptions.RaiseException;
-import org.jruby.runtime.backtrace.RubyStackTraceElement;
 import org.jruby.runtime.builtin.IRubyObject;
-
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.google.errorprone.annotations.ThreadSafe;
 
 import lombok.Getter;
 
@@ -290,7 +284,7 @@ public class Game extends Canvas {
         rgssInit();
         main:
         while (true) {
-            for (int i = 0; i < 1; i++) {
+            for (int i = 1; i <= 1; i++) {
                 String file = String.format("{%04d}", i);
                 String title = List.of("Main", "Audio").get(i);
                 String script = Files.readString(Path.of("Scripts/" + file + " " + title + ".rb"), StandardCharsets.UTF_8);

@@ -1,5 +1,5 @@
 
-Audio.bgm_play('Audio/BGM/Airship')
+Audio.bgm_play('Audio/BGM/Airship', 10, 150, 5000000)
 
 loop do
     Graphics.update

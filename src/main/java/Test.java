@@ -12,12 +12,14 @@ public class Test {
     public static void main(String[] args) throws Exception {
         AudioInputStream source = AudioSystem.getAudioInputStream(new File("ShipTest.ogg"));
         System.out.println(source.getFormat()); // VORBISENC 44100.0 Hz, unknown bits per sample, stereo, 1 bytes/frame, 24000.0 frames/second
+        System.out.println(source.getFormat().getSampleRate());
+        System.out.println(source.getFormat().getFrameRate());
         System.out.println();
         System.out.println(source.getFormat().properties());
 
         // Convert to 16 bit pcm signed samples that java sound can play (this produces static noise if I set big endian true, does this depend on native endianness?)
         AudioFormat sourceFormat = source.getFormat();
-        AudioFormat targetFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels() * 2, sourceFormat.getSampleRate(), false);
+        AudioFormat targetFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels()*2, sourceFormat.getSampleRate(), sourceFormat.isBigEndian());
         if (!sourceFormat.matches(targetFormat)) {
             System.out.println("CONVERTING!");
             source = AudioSystem.getAudioInputStream(targetFormat, source);
