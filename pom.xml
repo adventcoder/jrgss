@@ -41,15 +41,10 @@
             <version>0.5.4</version>
         </dependency>
         <dependency>
-            <groupId>com.twelvemonkeys</groupId>
-            <artifactId>twelvemonkeys</artifactId>
-            <version>3.13.1</version>
-            <type>pom</type>
-        </dependency>
-        <dependency>
-            <groupId>com.github.trilarion</groupId>
-            <artifactId>java-vorbis-support</artifactId>
-            <version>1.2.1</version>
+            <groupId>com.googlecode.soundlibs</groupId>
+            <artifactId>vorbisspi</artifactId>
+            <version>1.0.3.3</version>
+            <scope>compile</scope>
         </dependency>
         <!-- <dependency>
             <groupId>org.lwjgl</groupId>

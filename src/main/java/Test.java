@@ -28,7 +28,7 @@ public class Test {
             System.out.println();
         }
 
-        int pitch = 150; // allowed values 50 - 150
+        int pitch = 75; // allowed values 50 - 150
         if (pitch != 100) {
             float newSampleRate = sourceFormat.getSampleRate() * pitch / 100f;
             // reinterpret the stream with the same samples but adjusted sample rate

@@ -21,8 +21,9 @@ import org.jruby.RubyNumeric;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.builtin.IRubyObject;
 
-import com.github.trilarion.sound.vorbis.sampled.spi.VorbisAudioFileReader;
-
+import javazoom.spi.vorbis.sampled.file.VorbisAudioFileReader;
+import javazoom.spi.vorbis.sampled.file.VorbisEncoding;
+import javazoom.spi.vorbis.sampled.file.VorbisFileFormatType;
 import lombok.RequiredArgsConstructor;
 
 //TODO: midi support? (probably don't care about this)
@@ -170,7 +171,7 @@ public class RubyAudio implements LineListener {
         AudioInputStream source = AudioSystem.getAudioInputStream(file);
         try {
             AudioFormat sourceFormat = source.getFormat();
-            if (source.getFormat().getEncoding().equals(VorbisAudioFileReader.VORBISENC)) {
+            if (source.getFormat().getEncoding() instanceof VorbisEncoding) {
                 // vorbis spi decodes to 16 bit signed pcm samples (seems to be little endian)
                 // retain sample rate and channels from source
                 sourceFormat = new AudioFormat(sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), true, false);

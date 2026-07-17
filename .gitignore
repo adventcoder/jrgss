@@ -4,10 +4,10 @@ target/
 test/*
 !test/.gitkeep
 
-Audio/
-Data/
-Fonts/
-Graphics/
-System/
-Game.exe
-Game.rvproj2
+/Audio/
+/Data/
+/Fonts/
+/Graphics/
+/System/
+/Game.exe
+/Game.rvproj2
