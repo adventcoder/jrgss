@@ -1,4 +1,4 @@
-package jrgss;
+package jrgss.graphics;
 
 import java.awt.image.Raster;
 import java.awt.image.WritableRaster;

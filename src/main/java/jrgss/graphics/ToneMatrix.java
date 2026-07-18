@@ -1,4 +1,4 @@
-package jrgss;
+package jrgss.graphics;
 
 //
 // a = 1 - 2/3 T.g

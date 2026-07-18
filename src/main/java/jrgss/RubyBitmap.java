@@ -38,6 +38,8 @@ import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.JRubyFile;
 
+import jrgss.graphics.RasterOps;
+
 public class RubyBitmap extends RubyObject {
     public static RubyClass createBitmapClass(Ruby runtime) {
         RubyClass cls = runtime.defineClass("Bitmap", runtime.getObject(), RubyBitmap::new);
