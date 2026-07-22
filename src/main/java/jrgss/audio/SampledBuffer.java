@@ -84,8 +84,8 @@ public class SampledBuffer implements AudioBuffer {
     }
 
     @Override
-    public SampledSource openSource(int pitch, int volume, int pos, boolean looping) throws LineUnavailableException {
-        return new SampledSource(this, pitch, volume, pos, looping);
+    public SampledSource openSource(int pitch, int pos, boolean looping) throws LineUnavailableException {
+        return new SampledSource(this, pitch, pos, looping);
     }
 
     @Override

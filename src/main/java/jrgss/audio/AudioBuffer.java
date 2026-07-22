@@ -15,7 +15,7 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 import jrgss.RTP;
 
 public interface AudioBuffer {
-    public AudioSource openSource(int volume, int pitch, int pos, boolean looping) throws LineUnavailableException;
+    public AudioSource openSource(int pitch, int pos, boolean looping) throws LineUnavailableException;
     public File getFile();
     public int getMemorySize();
 

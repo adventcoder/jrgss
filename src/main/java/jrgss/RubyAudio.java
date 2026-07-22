@@ -1,9 +1,8 @@
 package jrgss;
 
 import java.io.File;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.jruby.Ruby;
 import org.jruby.RubyModule;
@@ -65,64 +64,91 @@ public abstract class RubyAudio {
 
     public abstract void play(File file, int volume, int pitch, int pos) throws Exception;
     public abstract void stop();
-    public abstract void fade(int millis);
-    public abstract int pos();
 
     public static class Single extends RubyAudio {
-        private AudioBuffer buffer = null;
-        private AudioSource source = null;
+        private AudioSource source;
+        private boolean frozen;
+        private boolean pendingStart;
 
         public Single(Type type) {
             super(type);
         }
 
-        public void play(File file, int volume, int pitch, int pos) throws Exception {
-            if (isPlaying(file, pitch)) {
-                source.fadeVolume(volume, 0);
-                //NOTE: RGSS ignores position here
-                return;
-            }
-
-            if (source != null) {
-                source.stop();
-                source.close();
-            }
-
-            if (buffer == null || !file.equals(buffer.getFile()))
-                buffer = cache.get(file);
-
-            source = buffer.openSource(volume, pitch, pos, type.isBackground());
-            source.start();
+        public boolean isPlaying() {
+            return source != null && source.isRunning();
         }
 
         private boolean isPlaying(File file, int pitch) {
             return isPlaying() && file.equals(source.getBuffer().getFile()) && pitch == source.getPitch();
         }
 
-        private boolean isPlaying() {
-            return source != null && !source.isStopped();
+        @Override
+        public void play(File file, int volume, int pitch, int pos) throws Exception {
+            if (isPlaying(file, pitch)) {
+                source.setVolume(volume);
+                //NOTE: RGSS ignores position here
+            } else {
+                if (source != null)
+                    source.close();
+
+                AudioBuffer buffer = cache.get(file);
+                source = buffer.openSource(pitch, pos, type.isBackground());
+                source.setVolume(volume);
+                if (type == Type.ME) {
+                    bgm.freeze();
+                    source.setStopCallback(s -> bgm.unfreeze());
+                }
+                start();
+            }
+        }
+
+        public void start() {
+            if (frozen) {
+                pendingStart = true;
+            } else {
+                if (source == null) return;
+                source.start();
+            }
         }
 
         @Override
-        public void stop(){
-            if (source == null) return;
-            source.stop();
+        public void stop() {
+            if (frozen) {
+                pendingStart = false;
+            } else {
+                if (source == null) return;
+                source.stop();
+            }
         }
 
-        @Override
+        public void freeze() {
+            if (frozen) return; 
+            pendingStart = isPlaying();
+            stop();
+            frozen = true;
+        }
+
+        public void unfreeze() {
+            if (!frozen) return;
+            frozen = false;
+            if (pendingStart) {
+                start();
+                //fade(0, source.getVolume(), 500);
+            }
+        }
+
         public int pos() {
             return source == null ? 0 : source.getPosition();
         }
 
-        @Override
         public void fade(int millis) {
             if (source == null) return;
-            source.fadeVolume(0, millis);
+            source.setVolume(0);
         }
     }
 
     public static class Multi extends RubyAudio {
-        private Set<AudioSource> sources = new HashSet<>();
+        private Set<AudioSource> sources = ConcurrentHashMap.newKeySet();
 
         public Multi(Type type) {
             super(type);
@@ -130,44 +156,35 @@ public abstract class RubyAudio {
 
         @Override
         public void play(File file, int volume, int pitch, int pos) throws Exception {
-            removeStopped();
+            if (playedRecently(file)) return;
             AudioBuffer buffer = cache.get(file);
-            AudioSource source = buffer.openSource(volume, pitch, pos, type.isBackground());
+            AudioSource source = buffer.openSource(pitch, pos, type.isBackground());
+            source.setVolume(volume);
+            source.setStopCallback(this::sourceStopped);
             sources.add(source);
             source.start();
         }
 
-        private void removeStopped() {
-            Iterator<AudioSource> it = sources.iterator();
-            while (it.hasNext()) {
-                AudioSource source = it.next();
-                if (source.isStopped()) {
-                    source.close();
-                    it.remove();
-                }
-            }
+        private void sourceStopped(AudioSource source) {
+            sources.remove(source);
+            source.close();
+            System.out.println(sources.size());
+        }
+
+        private boolean playedRecently(File file) {
+            return false; // TODO
         }
 
         @Override
         public void stop() {
             sources.forEach(AudioSource::stop);
         }
-
-        @Override
-        public void fade(int millis) {
-            sources.forEach(source -> source.fadeVolume(0, millis));
-        }
-
-        @Override
-        public int pos() {
-            throw new UnsupportedOperationException();
-        }
     }
 
-    private static final RubyAudio bgm = new Single(Type.BGM);
-    private static final RubyAudio bgs = new Single(Type.BGS);
-    private static final RubyAudio me = new Single(Type.ME);
-    private static final RubyAudio se = new Multi(Type.SE);
+    private static final Single bgm = new Single(Type.BGM);
+    private static final Single bgs = new Single(Type.BGS);
+    private static final Single me = new Single(Type.ME);
+    private static final Multi se = new Multi(Type.SE);
 
     @JRubyMethod(meta = true, required = 1, optional = 3)
     public static void bgm_play(IRubyObject recv, IRubyObject... args) throws Exception {
@@ -251,10 +268,5 @@ public abstract class RubyAudio {
     @JRubyMethod(meta = true)
     public static void se_stop(IRubyObject recv) {
         se.stop();
-    }
-
-    @JRubyMethod(meta = true)
-    public static void se_fade(IRubyObject recv, IRubyObject arg0) {
-        se.fade(RubyNumeric.num2int(arg0));
     }
 }

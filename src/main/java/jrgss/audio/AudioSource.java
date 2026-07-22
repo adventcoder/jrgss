@@ -1,5 +1,7 @@
 package jrgss.audio;
 
+import java.util.function.Consumer;
+
 public interface AudioSource extends AutoCloseable {
     public AudioBuffer getBuffer();
     public boolean isLooping();
@@ -7,11 +9,12 @@ public interface AudioSource extends AutoCloseable {
     public int getPosition();
     public int getVolume();
     public void setVolume(int volume);
-    public void fadeVolume(int volume, int millis);
-    public boolean isStopped();
-    public boolean isStopping();
-    public boolean start();
-    public boolean stop();
+    public Consumer<AudioSource> getStopCallback();
+    public void setStopCallback(Consumer<AudioSource> callback);
+    public boolean isRunning();
+    public boolean isClosed();
+    public void start();
+    public void stop();
     @Override
     public void close();
 
