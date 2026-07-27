@@ -1,6 +1,8 @@
 package jrgss;
 
 import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.jruby.Ruby;
 import org.jruby.RubyModule;
@@ -8,7 +10,7 @@ import org.jruby.RubyNumeric;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.builtin.IRubyObject;
 
-import lombok.RequiredArgsConstructor;
+import jrgss.audio.AudioPlayer;
 
 public class RubyAudio {
     public static void createAudioModule(Ruby runtime) {
@@ -17,8 +19,23 @@ public class RubyAudio {
         mod.defineAnnotatedMethods(RubyAudio.class);
     }
 
-    public RubyAudio() {
+    private static class PlayState {
+        private File file;
+        private AudioPlayer player;
+    }
 
+    private PlayState background;
+    private Set<PlayState> effects = new HashSet<>();
+
+    public RubyAudio() {
+    }
+
+    public PlayState playBackground(File file, int volume, int pitch, int pos) {
+        return null;
+    }
+
+    public PlayState playEffect(File file, int volume, int pitch) {
+        return null;
     }
 
     private static final RubyAudio music = new RubyAudio();
