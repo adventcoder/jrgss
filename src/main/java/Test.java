@@ -1,66 +1,153 @@
-import java.io.File;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Map;
+
+import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.FloatControl;
+import javax.sound.sampled.Line;
+import javax.sound.sampled.Mixer;
+import javax.sound.sampled.SourceDataLine;
 
 public class Test {
 
     public static void main(String[] args) throws Exception {
-        AudioInputStream source = AudioSystem.getAudioInputStream(new File("ShipTest.ogg"));
-        System.out.println(source.getFormat()); // VORBISENC 44100.0 Hz, unknown bits per sample, stereo, 1 bytes/frame, 24000.0 frames/second
-        System.out.println(source.getFormat().getSampleRate());
-        System.out.println(source.getFormat().getFrameRate());
-        System.out.println();
-        System.out.println(source.getFormat().properties());
+        File file = new File("test/ShipTest.ogg");
+        //File file = new File("test/sample-3s.mp3");
+        //File file = new File("test/ahem_x.wav");
+        //File file = new File("test/Only-The-Lonely-2.mid");
+        int volume = 1; // allowed values 0 - 200
+        int pitch = 100; // allowed values 50 - 150
+        int startPos = 9000000;
+        int loopCount = 2;
 
-        // Convert to 16 bit pcm signed samples that java sound can play (this produces static noise if I set big endian true, does this depend on native endianness?)
-        AudioFormat sourceFormat = source.getFormat();
-        AudioFormat targetFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, sourceFormat.getSampleRate(), 16, sourceFormat.getChannels(), sourceFormat.getChannels()*2, sourceFormat.getSampleRate(), sourceFormat.isBigEndian());
-        if (!sourceFormat.matches(targetFormat)) {
-            System.out.println("CONVERTING!");
-            source = AudioSystem.getAudioInputStream(targetFormat, source);
-            sourceFormat = source.getFormat();
-            System.out.println(sourceFormat); // PCM_SIGNED 44100.0 Hz, 16 bit, stereo, 4 bytes/frame, little-endian
-            System.out.println();
+        AudioFileFormat fileFormat = AudioSystem.getAudioFileFormat(file);
+
+        byte[] data;
+        AudioFormat format;
+        int frameSize;
+        AudioInputStream stream = AudioSystem.getAudioInputStream(file);
+        try {
+
+            System.out.println("fileFormat: " + fileFormat);
+
+            format = stream.getFormat();
+            if (format.getSampleSizeInBits() == AudioSystem.NOT_SPECIFIED || format.getEncoding() == AudioFormat.Encoding.ULAW || format.getEncoding() == AudioFormat.Encoding.ALAW) {
+                System.out.println("Decoding!");
+                format = new AudioFormat(format.getSampleRate(), 16, format.getChannels(), true, format.isBigEndian());
+                stream = AudioSystem.getAudioInputStream(format, stream);
+            }
+
+            frameSize = format.getFrameSize();
+            if (frameSize == AudioSystem.NOT_SPECIFIED) throw new IOException("unknown frame size");
+
+            int frameLength = Math.toIntExact(stream.getFrameLength());
+            if (frameLength == AudioSystem.NOT_SPECIFIED) {
+                data = stream.readAllBytes();
+                frameLength = data.length / frameSize;
+            } else {;
+                data = stream.readNBytes(frameLength * frameSize);
+            }
+            System.out.println("frameLength: " + frameLength);
+            System.out.println("byteLength: " + data.length);
+        } finally {
+            stream.close();
         }
 
-        int pitch = 75; // allowed values 50 - 150
-        if (pitch != 100) {
-            float newSampleRate = sourceFormat.getSampleRate() * pitch / 100f;
-            // reinterpret the stream with the same samples but adjusted sample rate
-            source = new AudioInputStream(source, new AudioFormat(sourceFormat.getEncoding(), newSampleRate, sourceFormat.getSampleSizeInBits(), sourceFormat.getChannels(), sourceFormat.getFrameSize(), newSampleRate, sourceFormat.isBigEndian()), source.getFrameLength());
-        }
-
-        Clip clip = (Clip) AudioSystem.getLine(new DataLine.Info(Clip.class, source.getFormat()));
-        //SourceDataLine sourceDataLine = (SourceDataLine) AudioSystem.getLine(new DataLine.Info(SourceDataLine.class, source.getFormat())); // for streaming
-        System.out.println(clip.getClass()); // class com.sun.media.sound.DirectAudioDevice$DirectClip
-        clip.open(source);
-        System.out.println("frame length: " + clip.getFrameLength()); // this is the same even 
-
-        int volume = 40; // allowed values between 0 - 200
-        if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-            FloatControl gain = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
-            if (volume == 0) {
-                gain.setValue(gain.getMinimum());
-            } else {
-                gain.setValue(Math.min(Math.max(linearToDb(volume / 100f), gain.getMinimum()), gain.getMaximum()));
+        int oggLoopStart = -1;
+        int oggLoopLength = -1;
+        for (Map.Entry<String, Object> prop : fileFormat.properties().entrySet()) {
+            if (prop.getKey().startsWith("ogg.comment.ext.")) {
+                String comment = prop.getValue().toString();
+                System.out.println(comment);
+                if (comment.toLowerCase().startsWith("loopstart=")) {
+                    oggLoopStart = Integer.parseUnsignedInt(comment.substring("loopstart=".length()));
+                } else if (comment.toLowerCase().startsWith("looplength=")) {
+                    oggLoopLength = Integer.parseUnsignedInt(comment.substring("looplength=".length()));
+                }
             }
         }
+        int loopStart = oggLoopStart >= 0 ? oggLoopStart*frameSize : 0;
+        int loopEnd = oggLoopLength >= 0 ? loopStart + oggLoopLength*frameSize : data.length;
+        System.out.println("loopStart: " + loopStart);
+        System.out.println("loopEnd: " + loopEnd);
+        System.out.println("end: " + data.length);
 
-        clip.setFramePosition(volume);
-        clip.loop(Clip.LOOP_CONTINUOUSLY);
-        clip.start();
-        // clip.isRunning() is not immediately true...
-        do {
+        if (pitch != 100) {
+            float newSampleRate = format.getSampleRate() * pitch / 100f;
+            float newFrameRate = format.getFrameRate() * pitch / 100f;
+            format = new AudioFormat(format.getEncoding(), newSampleRate, format.getSampleSizeInBits(), format.getChannels(), format.getFrameSize(), newFrameRate, format.isBigEndian());
+        }
+
+
+        DataLine.Info lineInfo = new DataLine.Info(SourceDataLine.class, format);
+
+        System.out.println("Available mixers:");
+        for (Mixer.Info info : AudioSystem.getMixerInfo()) {
+            Mixer mixer = AudioSystem.getMixer(info);
+            if (mixer.getSourceLineInfo().length > 0) {
+                System.out.println("- " + info);
+            }
+        }
+        System.out.println();
+
+        Mixer defaultMixer = AudioSystem.getMixer(null);
+        System.out.println("mixer: " + defaultMixer.getMixerInfo());
+        for (Line.Info info : defaultMixer.getSourceLineInfo()) {
+            if (info.getLineClass() == SourceDataLine.class) {
+                DataLine.Info sourceLineInfo = (DataLine.Info) info;
+                System.out.println("buffer size: " + sourceLineInfo.getMinBufferSize() + " - " + sourceLineInfo.getMaxBufferSize());
+                for (AudioFormat mixerFormat : sourceLineInfo.getFormats()) {
+                    System.out.println("- " + mixerFormat);
+                }
+            }
+        }
+        System.out.println("max lines: " + defaultMixer.getMaxLines(lineInfo));
+        System.out.println();
+
+        SourceDataLine line = (SourceDataLine) defaultMixer.getLine(lineInfo);
+        line.open();
+
+        FloatControl gainControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+        gainControl.setValue(linearToDb(volume / 100f));
+
+        line.start();
+        System.out.println(line.isActive());
+
+        Thread thread = new Thread(() -> {
+            int pos = startPos;
+            int loopsRemaining = loopCount;
+            while (pos < loopStart)
+                pos += line.write(data, pos, loopStart - pos);
+            while (loopsRemaining > 0) {
+                while (pos < loopEnd)
+                    pos += line.write(data, pos, loopEnd - pos);
+                pos = loopStart;
+                loopsRemaining -= 1;
+            }
+            while (pos < data.length)
+                pos += line.write(data, pos, data.length - pos);
+            line.drain();
+        });
+        thread.setDaemon(true);
+        thread.start();
+
+        System.out.println("---");
+        while (thread.isAlive()) {
+            System.out.println(line.getLongFramePosition());
             Thread.sleep(100);
-            System.out.println(clip.getLongFramePosition() % clip.getFrameLength()); // is this right? what if there is a loop start/end set?
-        } while (clip.isRunning());
+        }
+        System.out.println(line.getLongFramePosition());
 
-        clip.close();
+        line.close();
     }
 
     private static float linearToDb(float gain) {

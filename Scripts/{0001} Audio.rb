@@ -1,6 +1,8 @@
 Graphics.frame_rate = 10
 
-Audio.bgm_play('Audio/BGM/Airship', 50, 150, 2000000)
+
+#Audio.bgm_play('Audio/BGM/Airship', 100, 150, 9000000)
+Audio.bgm_play('test/Only-The-Lonely-2.mid', 100, 100)
 
 weather = ['Rain', 'Wind', 'Storm']
 weather_index = 0
