@@ -20,16 +20,18 @@ import javax.sound.sampled.SourceDataLine;
 public class Test {
 
     public static void main(String[] args) throws Exception {
-        File file = new File("test/ShipTest.ogg");
-        //File file = new File("test/sample-3s.mp3");
+        //File file = new File("test/ShipTest.ogg");
+        File file = new File("test/sample-3s.mp3");
         //File file = new File("test/ahem_x.wav");
         //File file = new File("test/Only-The-Lonely-2.mid");
-        int volume = 1; // allowed values 0 - 200
+        // File file = new File("test/sample-3s-8khz-ulaw.wav");
+        int volume = 100; // allowed values 0 - 200
         int pitch = 100; // allowed values 50 - 150
-        int startPos = 9000000;
-        int loopCount = 2;
+        int startPos = 0;
+        int loopCount = 0;
 
         AudioFileFormat fileFormat = AudioSystem.getAudioFileFormat(file);
+        System.out.println("bits/sample: " + fileFormat.getFormat().getSampleSizeInBits());
 
         byte[] data;
         AudioFormat format;
@@ -80,6 +82,7 @@ public class Test {
         System.out.println("loopStart: " + loopStart);
         System.out.println("loopEnd: " + loopEnd);
         System.out.println("end: " + data.length);
+        System.out.println();
 
         if (pitch != 100) {
             float newSampleRate = format.getSampleRate() * pitch / 100f;
@@ -115,42 +118,54 @@ public class Test {
 
         SourceDataLine line = (SourceDataLine) defaultMixer.getLine(lineInfo);
         line.open();
-
-        FloatControl gainControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-        gainControl.setValue(linearToDb(volume / 100f));
-
-        line.start();
-        System.out.println(line.isActive());
-
-        Thread thread = new Thread(() -> {
-            int pos = startPos;
-            int loopsRemaining = loopCount;
-            while (pos < loopStart)
-                pos += line.write(data, pos, loopStart - pos);
-            while (loopsRemaining > 0) {
-                while (pos < loopEnd)
-                    pos += line.write(data, pos, loopEnd - pos);
-                pos = loopStart;
-                loopsRemaining -= 1;
+        try {
+            FloatControl gainControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+            System.out.println(gainControl.getMinimum());
+            System.out.println(gainControl.getMaximum());
+            if (volume == 0) {
+                gainControl.setValue(gainControl.getMinimum());
+            } else if (volume <= 100) {
+                float t = (volume - 1) / (float) (100 - 1);
+                float gain = -35f * (1f - t);
+                gainControl.setValue(Math.max(gain, gainControl.getMinimum()));
             }
-            while (pos < data.length)
-                pos += line.write(data, pos, data.length - pos);
-            line.drain();
-        });
-        thread.setDaemon(true);
-        thread.start();
+            System.out.println("Volume: " + gainControl.getValue() + " dB");
+            System.out.println();
 
-        System.out.println("---");
-        while (thread.isAlive()) {
+            Thread thread = new Thread(() -> {
+                line.start();
+                try {
+                    int pos = startPos;
+                    int loopsRemaining = loopCount;
+                    while (pos < loopStart)
+                        pos += line.write(data, pos, loopStart - pos);
+                    while (loopsRemaining > 0) {
+                        while (pos < loopEnd)
+                            pos += line.write(data, pos, loopEnd - pos);
+                        pos = loopStart;
+                        loopsRemaining -= 1;
+                    }
+                    while (pos < data.length)
+                        pos += line.write(data, pos, data.length - pos);
+                    line.drain();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                } finally {
+                    line.stop();
+                }
+            });
+            thread.setDaemon(true);
+            thread.start();
+
+            System.out.println("---");
+            while (thread.isAlive()) {
+                System.out.println(line.getLongFramePosition());
+                Thread.sleep(100);
+            }
             System.out.println(line.getLongFramePosition());
-            Thread.sleep(100);
+
+        } finally {
+            line.close();
         }
-        System.out.println(line.getLongFramePosition());
-
-        line.close();
-    }
-
-    private static float linearToDb(float gain) {
-        return 20f * (float) Math.log10(gain);
     }
 }
