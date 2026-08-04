@@ -4,32 +4,44 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.UnsupportedAudioFileException;
 
-public interface SampleReader {
+public interface ShortSampleReader {
     public static final int DEFAULT_BUFFER_FRAME_LENGTH = 4096;
 
     public int readNFrames(short[][] samples, int frameOffset, int maxFrames) throws IOException;
 
-    public static boolean supports(AudioFormat format) {
-        AudioFormat.Encoding encoding = format.getEncoding();
-        if (encoding.equals(AudioFormat.Encoding.PCM_SIGNED)) {
-            return format.getSampleSizeInBits() == 8 || format.getSampleSizeInBits() == 16 || format.getSampleSizeInBits() == 24 || format.getSampleSizeInBits() == 32;
-        } else if (encoding.equals(AudioFormat.Encoding.PCM_UNSIGNED)) {
-            return format.getSampleSizeInBits() == 8 || format.getSampleSizeInBits() == 16;
-        } else if (encoding.equals(AudioFormat.Encoding.PCM_FLOAT)) {
-            return format.getSampleSizeInBits() == 32;
-        } else {
-            return false;
+    public static Collection<AudioFormat> supportedFormats() {
+        List<AudioFormat> formats = new ArrayList<>();
+        for (int sampleDepth : new int[] { 8, 16, 24, 32 }) {
+            formats.add(new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, AudioSystem.NOT_SPECIFIED, sampleDepth, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, false));
+            formats.add(new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, AudioSystem.NOT_SPECIFIED, sampleDepth, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, true));
         }
+        for (int sampleDepth : new int[] { 8, 16 }) {
+            formats.add(new AudioFormat(AudioFormat.Encoding.PCM_UNSIGNED, AudioSystem.NOT_SPECIFIED, sampleDepth, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, false));
+            formats.add(new AudioFormat(AudioFormat.Encoding.PCM_UNSIGNED, AudioSystem.NOT_SPECIFIED, sampleDepth, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, true));
+        }
+        for (int sampleDepth : new int[] { 32 }) {
+            formats.add(new AudioFormat(AudioFormat.Encoding.PCM_FLOAT, AudioSystem.NOT_SPECIFIED, sampleDepth, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, false));
+            formats.add(new AudioFormat(AudioFormat.Encoding.PCM_FLOAT, AudioSystem.NOT_SPECIFIED, sampleDepth, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, AudioSystem.NOT_SPECIFIED, true));
+        }
+        return formats;
     }
 
-    public static SampleReader getReader(InputStream stream, AudioFormat format) {
+    public static ShortSampleReader getReader(InputStream stream, AudioFormat format) throws UnsupportedAudioFileException {
         return getReader(stream, format, DEFAULT_BUFFER_FRAME_LENGTH);
     }
 
-    public static SampleReader getReader(InputStream stream, AudioFormat format, int bufferFrameLength) {
+    public static ShortSampleReader getReader(InputStream stream, AudioFormat format, int bufferFrameLength) throws UnsupportedAudioFileException {
+        if (format.getChannels() == AudioSystem.NOT_SPECIFIED)
+            throw new UnsupportedAudioFileException();
+
         AudioFormat.Encoding encoding = format.getEncoding();
         if (encoding.equals(AudioFormat.Encoding.PCM_SIGNED)) {
             if (format.getSampleSizeInBits() == 8)
@@ -40,19 +52,21 @@ public interface SampleReader {
                 return new PcmSigned24Reader(stream, format.getChannels(), format.isBigEndian(), bufferFrameLength);
             if (format.getSampleSizeInBits() == 32)
                 return new PcmSigned32Reader(stream, format.getChannels(), format.isBigEndian(), bufferFrameLength);
-        } else if (encoding.equals(AudioFormat.Encoding.PCM_UNSIGNED)) {
+        }
+        if (encoding.equals(AudioFormat.Encoding.PCM_UNSIGNED)) {
             if (format.getSampleSizeInBits() == 8)
                 return new PcmUnsigned8Reader(stream, format.getChannels(), format.isBigEndian(), bufferFrameLength);
             if (format.getSampleSizeInBits() == 16)
                 return new PcmUnsigned16Reader(stream, format.getChannels(), format.isBigEndian(), bufferFrameLength);
-        } else if (encoding.equals(AudioFormat.Encoding.PCM_FLOAT)) {
+        }
+        if (encoding.equals(AudioFormat.Encoding.PCM_FLOAT)) {
             if (format.getSampleSizeInBits() == 32)
                 return new PcmFloat32Reader(stream, format.getChannels(), format.isBigEndian(), bufferFrameLength);
         }
-        throw new UnsupportedOperationException();
+        throw new UnsupportedAudioFileException();
     }
 
-    public static abstract class AbstractPcmReader implements SampleReader {
+    public static abstract class AbstractPcmReader implements ShortSampleReader {
         private final InputStream stream;
         private final int channels;
         private final int frameSize;
@@ -181,9 +195,9 @@ public interface SampleReader {
         @Override
         protected short getSample() {
             float sample = buffer.getFloat();
+            if (sample < -1f) return Short.MIN_VALUE;
             if (sample >= 1f) return Short.MAX_VALUE;
-            if (sample <= -1f) return Short.MIN_VALUE;
-            return (short) (sample * 32767f);
+            return (short) Math.floor(sample * 32768f);
         }
     }
 }

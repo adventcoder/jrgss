@@ -10,8 +10,6 @@ import org.jruby.RubyNumeric;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.builtin.IRubyObject;
 
-import jrgss.audio.AudioPlayer;
-
 public class RubyAudio {
     public static void createAudioModule(Ruby runtime) {
         RubyModule mod = runtime.defineModule("Audio");
@@ -19,27 +17,8 @@ public class RubyAudio {
         mod.defineAnnotatedMethods(RubyAudio.class);
     }
 
-    private static class PlayState {
-        private File file;
-        private AudioPlayer player;
-    }
-
-    private PlayState background;
-    private Set<PlayState> effects = new HashSet<>();
-
     public RubyAudio() {
     }
-
-    public PlayState playBackground(File file, int volume, int pitch, int pos) {
-        return null;
-    }
-
-    public PlayState playEffect(File file, int volume, int pitch) {
-        return null;
-    }
-
-    private static final RubyAudio music = new RubyAudio();
-    private static final RubyAudio sound = new RubyAudio();
 
     @JRubyMethod(meta = true, required = 1, optional = 3)
     public static void bgm_play(IRubyObject recv, IRubyObject... args) throws Exception {

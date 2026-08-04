@@ -7,92 +7,84 @@ import java.util.Arrays;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.Mixer;
 import javax.sound.sampled.UnsupportedAudioFileException;
-
-import lombok.Getter;
 
 public class AudioBuffer {
     private static final int UNKNOWN_INITIAL_FRAME_LENGTH = 4096;
 
-    public final short[][] samples;
+    public final byte[] data;
+    public final AudioFormat format;
     public final int frameLength;
-    public final float sampleRate;
-    private @Getter int loopStartFrame;
-    private @Getter int loopEndFrame; // (exclusive)
+    public int loopStart;
+    public int loopEnd; // (exclusive)
 
-    private AudioBuffer(short[][] samples, int frameLength, float sampleRate) {
-        this.samples = samples;
+    private AudioBuffer(byte[] data, AudioFormat format, int frameLength) {
+        this.data = data;
+        this.format = format;
         this.frameLength = frameLength;
-        this.sampleRate = sampleRate;
-        this.loopStartFrame = 0;
-        this.loopEndFrame = frameLength;
+        this.loopStart = 0;
+        this.loopEnd = frameLength;
     }
 
     public void setLoopStart(int frame) {
-        if (frame < 0 || frame >= loopEndFrame)
+        if (frame < 0 || frame >= loopEnd)
             throw new IllegalArgumentException("invalid loop start");
-        this.loopStartFrame = frame;
+        this.loopStart = frame;
     }
 
     public void setLoopEnd(int frame) {
-        if (frame <= loopStartFrame || frame > frameLength)
+        if (frame <= loopStart || frame > frameLength)
             throw new IllegalArgumentException("invalid loop start");
-        this.loopEndFrame = frame;
+        this.loopEnd = frame;
     }
 
     public void setLoopLength(int frames) {
-        if (frames <= 0 || loopStartFrame + frames >= frameLength)
+        if (frames <= 0 || loopStart + frames >= frameLength)
             throw new IllegalArgumentException("invalid loop length");
-        this.loopEndFrame = loopStartFrame + frames;
+        this.loopEnd = loopStart + frames;
     }
 
-    public static AudioBuffer read(File file) throws UnsupportedAudioFileException, IOException {
+    public static AudioBuffer read(File file, Mixer mixer, Class<? extends DataLine> sourceLineClass) throws UnsupportedAudioFileException, IOException {
         AudioInputStream stream = AudioSystem.getAudioInputStream(file);
         try {
-            AudioFormat format = stream.getFormat();
-            if (SampleReader.supports(format)) {
-                return readSamples(stream);
-            } else {
-                // other compressed formats get decoded to 16 bit signed pcm
-                AudioFormat newFormat = new AudioFormat(format.getSampleRate(), 16, format.getChannels(), true, format.isBigEndian());
-                return readSamples(AudioSystem.getAudioInputStream(newFormat, stream));
-            }
+            stream = AudioConverter.convert(stream, mixer, sourceLineClass);
+            return read(stream);
         } finally {
             stream.close();
         }
     }
 
-    private static AudioBuffer readSamples(AudioInputStream stream) throws IOException {
+    public static AudioBuffer read(AudioInputStream stream) throws UnsupportedAudioFileException, IOException {
         AudioFormat format = stream.getFormat();
+
+        if (format.getFrameSize() == AudioSystem.NOT_SPECIFIED)
+            throw new UnsupportedAudioFileException("unknown frame size");
+        int frameSize = format.getFrameSize();
+
+        byte[] data;
+        int pos = 0;
+
         int frameLength = Math.toIntExact(stream.getFrameLength());
- 
-        SampleReader sampleReader = SampleReader.getReader(stream, stream.getFormat());
- 
-        short[][] samples = new short[format.getChannels()][];
-        int framePos = 0;
         if (frameLength == AudioSystem.NOT_SPECIFIED) {
-            frameLength = UNKNOWN_INITIAL_FRAME_LENGTH;
-            for (int ch = 0; ch < samples.length; ch++)
-                samples[ch] = new short[UNKNOWN_INITIAL_FRAME_LENGTH];
+            data = new byte[UNKNOWN_INITIAL_FRAME_LENGTH * frameSize];
             while (true) {
-                if (framePos == frameLength) {
-                    frameLength = Math.multiplyExact(frameLength, 2);
-                    for (int ch = 0; ch < samples.length; ch++)
-                        samples[ch] = Arrays.copyOf(samples[ch], frameLength);
-                }
-                int framesRead = sampleReader.readNFrames(samples, framePos, frameLength - framePos);
-                if (framesRead == 0) break;
-                framePos += framesRead;
+                if (pos == data.length)
+                    data = Arrays.copyOf(data, data.length * 2);
+                int bytesRead = stream.read(data, pos, data.length - pos);
+                if (bytesRead < 0) break;
+                pos += bytesRead;
             }
         } else {
-            for (int ch = 0; ch < samples.length; ch++)
-                samples[ch] = new short[frameLength];
-            while (framePos < frameLength) {
-                int framesRead = sampleReader.readNFrames(samples, framePos, frameLength - framePos);
-                if (framesRead == 0) break;
-                framePos += framesRead;
+            data = new byte[Math.multiplyExact(frameLength, frameSize)];
+            while (pos < data.length) {
+                int bytesRead = stream.read(data, pos, data.length - pos);
+                if (bytesRead < 0) break;
+                pos += bytesRead;
             }
         }
-        return new AudioBuffer(samples, framePos, format.getSampleRate());
+
+        return new AudioBuffer(data, format, pos / frameSize);
     }    
 }

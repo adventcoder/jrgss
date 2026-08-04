@@ -21,10 +21,10 @@ public class Test {
 
     public static void main(String[] args) throws Exception {
         //File file = new File("test/ShipTest.ogg");
-        File file = new File("test/sample-3s.mp3");
+        //File file = new File("test/sample-3s.mp3");
         //File file = new File("test/ahem_x.wav");
         //File file = new File("test/Only-The-Lonely-2.mid");
-        // File file = new File("test/sample-3s-8khz-ulaw.wav");
+        File file = new File("test/sample-3s-8khz-ulaw.wav");
         int volume = 100; // allowed values 0 - 200
         int pitch = 100; // allowed values 50 - 150
         int startPos = 0;
@@ -43,9 +43,10 @@ public class Test {
 
             format = stream.getFormat();
             if (format.getSampleSizeInBits() == AudioSystem.NOT_SPECIFIED || format.getEncoding() == AudioFormat.Encoding.ULAW || format.getEncoding() == AudioFormat.Encoding.ALAW) {
-                System.out.println("Decoding!");
                 format = new AudioFormat(format.getSampleRate(), 16, format.getChannels(), true, format.isBigEndian());
                 stream = AudioSystem.getAudioInputStream(format, stream);
+                System.out.println("Decoding!");
+                System.out.println("newFormat: " + stream.getFormat());
             }
 
             frameSize = format.getFrameSize();
